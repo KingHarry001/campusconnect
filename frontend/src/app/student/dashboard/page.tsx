@@ -22,14 +22,17 @@ import { supabase } from "@/lib/supabase";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import AttendanceCheckIn from "@/components/dashboard/AttendanceCheckIn";
 import AIChatWidget from "@/components/dashboard/AIChatWidget";
-import GridBackground from "@/components/ui/GridBackground"; import { BACKEND_URL } from "@/lib/config"; 
-
+import GridBackground from "@/components/ui/GridBackground";
+import {
+  SkeletonListRow,
+  SkeletonStatCard,
+} from "@/components/ui/SkeletonDashboardCard";
+import { useAcademicCalendar } from "@/hooks/useAcademicCalendar";
 
 const TABS = [
   { key: "overview", label: "Weekly Overview", icon: LayoutGrid },
   { key: "assignments", label: "Assignments", icon: ClipboardList },
   { key: "attendance", label: "Attendance", icon: CalendarCheck },
-  { key: "complaint", label: "Submit Complaint", icon: MessageCircle },
   { key: "news", label: "News", icon: Newspaper },
 ];
 
@@ -43,6 +46,19 @@ const WEEKDAYS = [
   "Sunday",
 ];
 
+/* ─── Shared skeleton block — matches the glass card shape used everywhere ─── */
+function SkeletonCard({ className = "" }: { className?: string }) {
+  return (
+    <div
+      className={`rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6 animate-pulse ${className}`}
+    >
+      <div className="h-3 w-16 bg-gray-200 dark:bg-white/10 rounded-full mb-3" />
+      <div className="h-4 w-2/3 bg-gray-200 dark:bg-white/10 rounded-full mb-2" />
+      <div className="h-3 w-1/2 bg-gray-100 dark:bg-white/5 rounded-full" />
+    </div>
+  );
+}
+
 export default function StudentDashboard() {
   const {
     profile,
@@ -51,6 +67,7 @@ export default function StudentDashboard() {
     refreshProfile,
     signOut,
   } = useAuth();
+  const { calendar, loading: calendarLoading } = useAcademicCalendar();
   const [active, setActive] = useState("overview");
 
   const [classes, setClasses] = useState<any[]>([]);
@@ -59,21 +76,25 @@ export default function StudentDashboard() {
   const [assignmentsLoading, setAssignmentsLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
-    // Don't fetch while auth is still resolving
-    if (authLoading) return;
+    if (authLoading || calendarLoading) return;
 
-    // If profile loaded but has no level, stop spinners immediately
     if (!profile?.level) {
       setClassesLoading(false);
       setAssignmentsLoading(false);
       return;
     }
+    console.log("DEBUG level:", profile?.level, "calendar:", calendar);
 
-    // Get course IDs for this level once (shared between both queries)
-    const { data: levelCourses } = await supabase
+    let courseQuery = supabase
       .from("courses")
       .select("id")
       .eq("level", profile.level);
+    if (calendar) {
+      courseQuery = courseQuery
+        .eq("session", calendar.session)
+        .eq("semester", calendar.semester);
+    }
+    const { data: levelCourses } = await courseQuery;
     const courseIds = (levelCourses || []).map((c: any) => c.id);
 
     if (courseIds.length === 0) {
@@ -84,7 +105,6 @@ export default function StudentDashboard() {
       return;
     }
 
-    // Run both queries in parallel
     const [{ data: classData }, { data: assignmentData }] = await Promise.all([
       supabase
         .from("classes")
@@ -101,7 +121,7 @@ export default function StudentDashboard() {
     setAssignments(assignmentData || []);
     setClassesLoading(false);
     setAssignmentsLoading(false);
-  }, [authLoading, profile?.level]);
+  }, [authLoading, calendarLoading, calendar, profile?.level]);
 
   useEffect(() => {
     fetchData();
@@ -122,6 +142,7 @@ export default function StudentDashboard() {
             classes={classes}
             loading={classesLoading}
             assignments={assignments}
+            calendar={calendar}
           />
         )}
         {active === "assignments" && (
@@ -137,9 +158,8 @@ export default function StudentDashboard() {
         {active === "complaint" && <ComplaintForm profile={profile} />}
         {active === "news" && <NewsView />}
       </DashboardLayout>
-      <AIChatWidget />
+      {/* <AIChatWidget /> */}
 
-      {/* Force avatar upload if student has no profile picture */}
       {!authLoading && profile && !profile.avatar_url && (
         <AvatarUploadModal
           session={session}
@@ -152,7 +172,13 @@ export default function StudentDashboard() {
 }
 
 /* ─── Weekly Overview ─── */
-function WeeklyOverview({ profile, classes, loading, assignments }: any) {
+function WeeklyOverview({
+  profile,
+  classes,
+  loading,
+  assignments,
+  calendar,
+}: any) {
   const hour = new Date().getHours();
   const greeting =
     hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
@@ -162,15 +188,14 @@ function WeeklyOverview({ profile, classes, loading, assignments }: any) {
   );
   const upcoming = pending.slice(0, 4);
 
-  // Warn if this student's level hasn't been set yet
   const levelMissing = !loading && !profile?.level;
 
   return (
     <div className="space-y-6">
       {/* Hero banner */}
-      <div className="relative bg-[#0a0a0a] text-white rounded-3xl p-6 sm:p-10 overflow-hidden">
+      <div className="relative bg-[#0a0a0a] text-white rounded-3xl p-6 sm:p-10 overflow-hidden shadow-lifted-dark">
         <GridBackground size={40} />
-        <p className="relative text-sm text-white/40 mb-2">
+        <p className="relative text-sm text-white/40 mb-2 font-mono">
           {new Date().toLocaleDateString("en-US", {
             weekday: "long",
             month: "long",
@@ -184,36 +209,42 @@ function WeeklyOverview({ profile, classes, loading, assignments }: any) {
           </span>
         </h2>
         <div className="relative grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[
-            { label: "Classes this week", value: String(classes.length) },
-            { label: "Pending assignments", value: String(pending.length) },
-            { label: "Department", value: "Comp. Eng." },
-            {
-              label: "Level",
-              value: profile?.level ? `${profile.level} Level` : "—",
-            },
-          ].map((s) => (
-            <div
-              key={s.label}
-              className="bg-white/5 rounded-2xl p-4 min-h-[76px] flex flex-col justify-between"
-            >
-              <p className="text-xs text-white/40 mb-1 leading-snug">
-                {s.label}
-              </p>
-              <p className="text-lg sm:text-xl font-medium text-green-400">
-                {s.value}
-              </p>
-            </div>
-          ))}
+          {loading
+            ? [...Array(4)].map((_, i) => <SkeletonStatCard key={i} />)
+            : [
+                { label: "Classes this week", value: String(classes.length) },
+                { label: "Pending assignments", value: String(pending.length) },
+                {
+                  label: "Term",
+                  value: calendar
+                    ? `Sem ${calendar.semester} · ${calendar.session}`
+                    : "—",
+                },
+                {
+                  label: "Level",
+                  value: profile?.level ? `${profile.level} Level` : "—",
+                },
+              ].map((s) => (
+                <div
+                  key={s.label}
+                  className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-4 min-h-[76px] flex flex-col justify-between"
+                >
+                  <p className="text-xs text-white/40 mb-1 leading-snug">
+                    {s.label}
+                  </p>
+                  <p className="text-lg sm:text-xl font-mono font-medium text-green-400">
+                    {s.value}
+                  </p>
+                </div>
+              ))}
         </div>
       </div>
 
-      {/* Level not configured warning */}
       {levelMissing && (
-        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 text-sm">
+        <div className="flex items-start gap-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-2xl px-5 py-4 text-sm shadow-soft dark:shadow-soft-dark">
           <AlertCircle size={18} className="text-amber-500 shrink-0 mt-0.5" />
           <div>
-            <p className="font-medium text-amber-900">
+            <p className="font-medium text-amber-900 dark:text-amber-200">
               Your study level is not set
             </p>
             <p className="text-amber-700 mt-0.5">
@@ -227,32 +258,44 @@ function WeeklyOverview({ profile, classes, loading, assignments }: any) {
 
       <div className="grid md:grid-cols-2 gap-6">
         {/* Weekly schedule */}
-        <div className="rounded-3xl border border-gray-100 p-6 sm:p-8">
-          <h3 className="text-lg font-medium">Weekly schedule</h3>
+        <div className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6 sm:p-8">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+            Weekly schedule
+          </h3>
           <p className="text-sm text-gray-400 mb-6">
             All lectures for the coming week
           </p>
           {loading ? (
-            <div className="flex items-center gap-2 text-sm text-gray-400">
-              <Loader2 size={14} className="animate-spin" /> Loading...
+            <div className="space-y-4">
+              {[...Array(4)].map((_, i) => (
+                <SkeletonListRow key={i} />
+              ))}
             </div>
           ) : (
             <div className="space-y-4">
               {WEEKDAYS.map((day) => (
                 <div
                   key={day}
-                  className="flex items-start justify-between border-b border-gray-50 pb-3 last:border-0 last:pb-0"
+                  className="flex items-start justify-between border-b border-gray-50 dark:border-white/5 pb-3 last:border-0 last:pb-0"
                 >
-                  <p className="text-xs font-medium text-gray-400 tracking-wide w-28 pt-0.5">
+                  <p className="text-[11px] font-mono font-medium text-brand-green tracking-wide w-28 pt-0.5">
                     {day.toUpperCase()}
                   </p>
                   <div className="flex-1 text-right">
                     {byDay(day).length === 0 ? (
-                      <p className="text-sm text-gray-300">No classes</p>
+                      <p className="text-sm text-gray-300 dark:text-gray-600">
+                        No classes
+                      </p>
                     ) : (
                       byDay(day).map((c: any) => (
-                        <p key={c.id} className="text-sm">
-                          {c.courses?.code} · {c.start_time}–{c.end_time}
+                        <p
+                          key={c.id}
+                          className="text-sm text-gray-700 dark:text-gray-200"
+                        >
+                          <span className="font-mono text-xs">
+                            {c.courses?.code}
+                          </span>{" "}
+                          · {c.start_time}–{c.end_time}
                           {c.locations?.name ? ` · ${c.locations.name}` : ""}
                         </p>
                       ))
@@ -265,10 +308,18 @@ function WeeklyOverview({ profile, classes, loading, assignments }: any) {
         </div>
 
         {/* Upcoming deadlines */}
-        <div className="rounded-3xl border border-gray-100 p-6 sm:p-8">
-          <h3 className="text-lg font-medium">Upcoming deadlines</h3>
+        <div className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6 sm:p-8">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+            Upcoming deadlines
+          </h3>
           <p className="text-sm text-gray-400 mb-6">Next 4 assignments</p>
-          {upcoming.length === 0 ? (
+          {loading ? (
+            <div className="space-y-4">
+              {[...Array(3)].map((_, i) => (
+                <SkeletonListRow key={i} />
+              ))}
+            </div>
+          ) : upcoming.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-center">
               <CheckCircle2 size={28} className="text-green-200 mb-3" />
               <p className="text-sm text-gray-400">No upcoming deadlines 🎉</p>
@@ -278,10 +329,13 @@ function WeeklyOverview({ profile, classes, loading, assignments }: any) {
               {upcoming.map((a: any) => (
                 <li
                   key={a.id}
-                  className="border-b border-gray-50 pb-3 last:border-0 last:pb-0"
+                  className="border-b border-gray-50 dark:border-white/5 pb-3 last:border-0 last:pb-0"
                 >
-                  <p className="text-sm font-medium">
-                    {a.courses?.code} · {a.title}
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    <span className="font-mono text-xs text-brand-green">
+                      {a.courses?.code}
+                    </span>{" "}
+                    · {a.title}
                   </p>
                   <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
                     <Clock size={11} />
@@ -308,55 +362,63 @@ function AssignmentsView({ assignments, loading, profile }: any) {
   const [submitting, setSubmitting] = useState<string | null>(null);
   const [submittedIds, setSubmittedIds] = useState<Set<string>>(new Set());
 
-const handleUpload = async (assignmentId: string, file: File) => {
-  setSubmitting(assignmentId);
-  try {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    const token = session?.access_token;
+  const handleUpload = async (assignmentId: string, file: File) => {
+    setSubmitting(assignmentId);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not signed in.");
 
-    if (!token) {
-      throw new Error("You're not signed in — please sign in again.");
+      const ext = file.name.split(".").pop();
+      const filePath = `${user.id}/${assignmentId}-${Date.now()}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("submissions")
+        .upload(filePath, file, { contentType: file.type });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from("submissions")
+        .getPublicUrl(filePath);
+
+      const { error: insertError } = await supabase
+        .from("assignment_submissions")
+        .insert({
+          assignment_id: assignmentId,
+          student_id: user.id,
+          file_url: urlData.publicUrl,
+          file_name: file.name,
+          status: "submitted",
+        });
+
+      if (insertError) throw insertError;
+
+      setSubmittedIds((prev) => new Set([...prev, assignmentId]));
+    } catch (err: any) {
+      console.error("Assignment upload error:", err);
+    } finally {
+      setSubmitting(null);
     }
+  };
 
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("assignmentId", assignmentId);
-
-    const res = await fetch(`${BACKEND_URL}/api/assignments/submit`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: formData,
-    });
-
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || `Upload failed (status ${res.status})`);
-    }
-
-    setSubmittedIds((prev) => new Set([...prev, assignmentId]));
-  } catch (err: any) {
-    console.error("Assignment upload error:", err);
-    // consider surfacing err.message to the user via a toast or inline error state
-  } finally {
-    setSubmitting(null);
-  }
-};
-
-  if (loading)
+  if (loading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-gray-400 py-10">
-        <Loader2 size={16} className="animate-spin" /> Loading assignments...
+      <div className="space-y-4">
+        {[...Array(3)].map((_, i) => (
+          <SkeletonCard key={i} />
+        ))}
       </div>
     );
+  }
 
   if (assignments.length === 0) {
     return (
-      <div className="rounded-3xl border border-gray-100 p-10 sm:p-16 flex flex-col items-center text-center">
+      <div className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-10 sm:p-16 flex flex-col items-center text-center">
         <ClipboardList
           size={32}
-          className="text-gray-200 mb-4"
+          className="text-gray-200 dark:text-gray-700 mb-4"
           strokeWidth={1.5}
         />
         <p className="text-gray-400">No assignments yet</p>
@@ -370,31 +432,45 @@ const handleUpload = async (assignmentId: string, file: File) => {
         const overdue = a.deadline && new Date(a.deadline) < new Date();
         const submitted = submittedIds.has(a.id);
         return (
-          <div key={a.id} className="rounded-3xl border border-gray-100 p-6">
+          <div
+            key={a.id}
+            className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6"
+          >
             <div className="flex items-start justify-between gap-4 mb-4">
               <div>
-                <p className="text-xs text-green-700 font-medium">
+                <p className="text-xs font-mono text-brand-green font-medium">
                   {a.courses?.code}
                 </p>
-                <p className="text-sm font-medium mt-0.5">{a.title}</p>
+                <p className="text-sm font-medium mt-0.5 text-gray-900 dark:text-white">
+                  {a.title}
+                </p>
                 {a.description && (
-                  <p className="text-sm text-gray-500 mt-2 leading-relaxed">
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 leading-relaxed">
                     {a.description}
                   </p>
                 )}
               </div>
               <span
-                className={`shrink-0 text-xs px-2.5 py-1 rounded-full font-medium ${overdue ? "bg-red-50 text-red-600" : "bg-green-50 text-green-700"}`}
+                className={`shrink-0 text-xs font-mono px-2.5 py-1 rounded-full font-medium border ${
+                  overdue
+                    ? "bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border-red-100 dark:border-red-900"
+                    : "bg-brand-green/10 text-brand-green border-brand-green/20"
+                }`}
               >
                 {a.deadline
-                  ? `${overdue ? "Closed" : "Due"} ${new Date(a.deadline).toLocaleDateString([], { month: "short", day: "numeric" })}`
+                  ? `${overdue ? "Closed" : "Due"} ${new Date(
+                      a.deadline,
+                    ).toLocaleDateString([], {
+                      month: "short",
+                      day: "numeric",
+                    })}`
                   : "No deadline"}
               </span>
             </div>
 
             {!overdue &&
               (submitted ? (
-                <div className="flex items-center gap-2 text-green-600 text-sm">
+                <div className="flex items-center gap-2 text-brand-green text-sm">
                   <CheckCircle2 size={15} /> Submitted
                 </div>
               ) : (
@@ -409,7 +485,7 @@ const handleUpload = async (assignmentId: string, file: File) => {
                       if (file) handleUpload(a.id, file);
                     }}
                   />
-                  <span className="flex items-center gap-2 bg-[#0a0a0a] text-white rounded-full px-4 py-2 text-xs font-medium hover:bg-gray-800 transition">
+                  <span className="flex items-center gap-2 bg-[#0a0a0a] dark:bg-white text-white dark:text-[#0a0a0a] rounded-full px-4 py-2 text-xs font-medium hover:bg-gray-800 dark:hover:bg-gray-100 transition shadow-soft dark:shadow-soft-dark">
                     {submitting === a.id ? (
                       <Loader2 size={13} className="animate-spin" />
                     ) : (
@@ -430,19 +506,22 @@ const handleUpload = async (assignmentId: string, file: File) => {
 
 /* ─── Attendance View ─── */
 function AttendanceView({ classes, loading }: any) {
-  if (loading)
+  if (loading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-gray-400 py-10">
-        <Loader2 size={16} className="animate-spin" /> Loading classes...
+      <div className="space-y-4">
+        {[...Array(3)].map((_, i) => (
+          <SkeletonCard key={i} />
+        ))}
       </div>
     );
+  }
 
   if (classes.length === 0) {
     return (
-      <div className="rounded-3xl border border-gray-100 p-10 sm:p-16 flex flex-col items-center text-center">
+      <div className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-10 sm:p-16 flex flex-col items-center text-center">
         <CalendarCheck
           size={32}
-          className="text-gray-200 mb-4"
+          className="text-gray-200 dark:text-gray-700 mb-4"
           strokeWidth={1.5}
         />
         <p className="text-gray-400">No classes to check into yet</p>
@@ -453,11 +532,17 @@ function AttendanceView({ classes, loading }: any) {
   return (
     <div className="space-y-4">
       {classes.map((c: any) => (
-        <div key={c.id} className="rounded-3xl border border-gray-100 p-6">
+        <div
+          key={c.id}
+          className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6"
+        >
           <div className="flex items-center gap-3 mb-4">
             <div>
-              <p className="text-sm font-medium">
-                {c.courses?.code} — {c.courses?.title}
+              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                <span className="font-mono text-xs text-brand-green">
+                  {c.courses?.code}
+                </span>{" "}
+                — {c.courses?.title}
               </p>
               {c.locations?.name && (
                 <p className="flex items-center gap-1 text-xs text-gray-400 mt-0.5">
@@ -465,7 +550,7 @@ function AttendanceView({ classes, loading }: any) {
                   {c.locations.building}
                 </p>
               )}
-              <p className="text-xs text-gray-400 mt-0.5">
+              <p className="text-xs font-mono text-gray-400 mt-0.5">
                 {c.day} · {c.start_time}–{c.end_time}
               </p>
             </div>
@@ -482,6 +567,7 @@ function ComplaintForm({ profile }: any) {
   const [lecturers, setLecturers] = useState<any[]>([]);
   const [courses, setCourses] = useState<any[]>([]);
   const [mine, setMine] = useState<any[]>([]);
+  const [loadingMine, setLoadingMine] = useState(true);
   const [form, setForm] = useState({
     lecturerId: "",
     courseId: "",
@@ -494,6 +580,7 @@ function ComplaintForm({ profile }: any) {
   useEffect(() => {
     if (!profile?.id) return;
     const load = async () => {
+      setLoadingMine(true);
       const [{ data: lecs }, { data: crs }, { data: myComplaints }] =
         await Promise.all([
           supabase.from("users").select("id, full_name").eq("role", "lecturer"),
@@ -510,6 +597,7 @@ function ComplaintForm({ profile }: any) {
       setLecturers(lecs || []);
       setCourses(crs || []);
       setMine(myComplaints || []);
+      setLoadingMine(false);
     };
     load();
   }, [profile?.id, profile?.level]);
@@ -548,17 +636,19 @@ function ComplaintForm({ profile }: any) {
     <div className="grid md:grid-cols-2 gap-6">
       <form
         onSubmit={handleSubmit}
-        className="rounded-3xl border border-gray-100 p-6 sm:p-8 space-y-5"
+        className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6 sm:p-8 space-y-5"
       >
         <div>
-          <h2 className="text-lg font-medium">Submit a complaint</h2>
+          <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+            Submit a complaint
+          </h2>
           <p className="text-sm text-gray-400">
             Send an official message to a lecturer
           </p>
         </div>
 
         {error && (
-          <p className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3">
+          <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 rounded-xl px-4 py-3">
             {error}
           </p>
         )}
@@ -566,14 +656,14 @@ function ComplaintForm({ profile }: any) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label
-              className="text-sm font-medium block mb-2"
+              className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200"
               htmlFor="lecturer"
             >
               Lecturer
             </label>
             <select
               id="lecturer"
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-400/30"
+              className="w-full border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/30"
               value={form.lecturerId}
               onChange={(e) => setForm({ ...form, lecturerId: e.target.value })}
             >
@@ -586,12 +676,15 @@ function ComplaintForm({ profile }: any) {
             </select>
           </div>
           <div>
-            <label className="text-sm font-medium block mb-2" htmlFor="course">
+            <label
+              className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200"
+              htmlFor="course"
+            >
               Course (optional)
             </label>
             <select
               id="course"
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-400/30"
+              className="w-full border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/30"
               value={form.courseId}
               onChange={(e) => setForm({ ...form, courseId: e.target.value })}
             >
@@ -606,12 +699,15 @@ function ComplaintForm({ profile }: any) {
         </div>
 
         <div>
-          <label className="text-sm font-medium block mb-2" htmlFor="subject">
+          <label
+            className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200"
+            htmlFor="subject"
+          >
             Subject
           </label>
           <input
             id="subject"
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-400/30"
+            className="w-full border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/30"
             placeholder="Short summary"
             value={form.subject}
             onChange={(e) => setForm({ ...form, subject: e.target.value })}
@@ -619,12 +715,15 @@ function ComplaintForm({ profile }: any) {
         </div>
 
         <div>
-          <label className="text-sm font-medium block mb-2" htmlFor="message">
+          <label
+            className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200"
+            htmlFor="message"
+          >
             Message
           </label>
           <textarea
             id="message"
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm h-32 focus:outline-none focus:ring-2 focus:ring-green-400/30 resize-none"
+            className="w-full border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-xl px-4 py-3 text-sm h-32 focus:outline-none focus:ring-2 focus:ring-brand-green/30 resize-none"
             placeholder="Describe your concern..."
             value={form.message}
             onChange={(e) => setForm({ ...form, message: e.target.value })}
@@ -634,24 +733,31 @@ function ComplaintForm({ profile }: any) {
         <button
           type="submit"
           disabled={saving}
-          className="flex items-center gap-2 bg-[#0a0a0a] text-white rounded-full px-6 py-3 text-sm font-medium hover:bg-gray-800 transition disabled:opacity-50"
+          className="flex items-center gap-2 bg-[#0a0a0a] dark:bg-white text-white dark:text-[#0a0a0a] rounded-full px-6 py-3 text-sm font-medium hover:bg-gray-800 dark:hover:bg-gray-100 transition disabled:opacity-50 shadow-soft dark:shadow-soft-dark"
         >
           {saving && <Loader2 size={14} className="animate-spin" />}
           {saving ? "Sending..." : "Send complaint"}
         </button>
       </form>
 
-      {/* My complaints */}
-      <div className="rounded-3xl border border-gray-100 p-6 sm:p-8">
-        <h2 className="text-lg font-medium">My complaints</h2>
+      <div className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6 sm:p-8">
+        <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+          My complaints
+        </h2>
         <p className="text-sm text-gray-400 mb-6">
           Recent submissions and their status
         </p>
-        {mine.length === 0 ? (
+        {loadingMine ? (
+          <div className="space-y-3">
+            {[...Array(3)].map((_, i) => (
+              <SkeletonListRow key={i} />
+            ))}
+          </div>
+        ) : mine.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 text-center">
             <MessageCircle
               size={28}
-              className="text-gray-200 mb-3"
+              className="text-gray-200 dark:text-gray-700 mb-3"
               strokeWidth={1.5}
             />
             <p className="text-sm text-gray-400">Nothing submitted yet</p>
@@ -659,11 +765,20 @@ function ComplaintForm({ profile }: any) {
         ) : (
           <ul className="space-y-3">
             {mine.map((c: any) => (
-              <li key={c.id} className="border border-gray-100 rounded-2xl p-4">
+              <li
+                key={c.id}
+                className="border border-gray-100 dark:border-white/10 rounded-2xl p-4"
+              >
                 <div className="flex items-center justify-between mb-1">
-                  <p className="text-sm font-medium">{c.subject}</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {c.subject}
+                  </p>
                   <span
-                    className={`text-xs px-2.5 py-1 rounded-full font-medium ${c.status === "resolved" ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"}`}
+                    className={`text-xs font-mono px-2.5 py-1 rounded-full font-medium ${
+                      c.status === "resolved"
+                        ? "bg-brand-green/10 text-brand-green"
+                        : "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400"
+                    }`}
                   >
                     {c.status}
                   </span>
@@ -673,7 +788,7 @@ function ComplaintForm({ profile }: any) {
                   {c.courses?.code ? ` · ${c.courses.code}` : ""}
                 </p>
                 {c.reply && (
-                  <p className="text-xs text-gray-500 mt-2 bg-gray-50 rounded-xl px-3 py-2">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 bg-gray-50 dark:bg-white/5 rounded-xl px-3 py-2">
                     Reply: {c.reply}
                   </p>
                 )}
@@ -703,17 +818,35 @@ function NewsView() {
     load();
   }, []);
 
-  if (loading)
+  if (loading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-gray-400 py-10">
-        <Loader2 size={16} className="animate-spin" /> Loading news...
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {[...Array(3)].map((_, i) => (
+          <div
+            key={i}
+            className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark overflow-hidden animate-pulse"
+          >
+            <div className="aspect-[16/10] bg-gray-100 dark:bg-white/5" />
+            <div className="p-5 space-y-3">
+              <div className="h-3 w-16 bg-gray-200 dark:bg-white/10 rounded-full" />
+              <div className="h-4 w-4/5 bg-gray-200 dark:bg-white/10 rounded-full" />
+              <div className="h-3 w-full bg-gray-100 dark:bg-white/5 rounded-full" />
+              <div className="h-3 w-2/3 bg-gray-100 dark:bg-white/5 rounded-full" />
+            </div>
+          </div>
+        ))}
       </div>
     );
+  }
 
   if (news.length === 0) {
     return (
-      <div className="rounded-3xl border border-gray-100 p-10 sm:p-16 flex flex-col items-center text-center">
-        <Newspaper size={32} className="text-gray-200 mb-4" strokeWidth={1.5} />
+      <div className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-10 sm:p-16 flex flex-col items-center text-center">
+        <Newspaper
+          size={32}
+          className="text-gray-200 dark:text-gray-700 mb-4"
+          strokeWidth={1.5}
+        />
         <p className="text-gray-400">No news yet</p>
       </div>
     );
@@ -724,9 +857,9 @@ function NewsView() {
       {news.map((n: any) => (
         <article
           key={n.id}
-          className="rounded-3xl border border-gray-100 overflow-hidden flex flex-col"
+          className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark overflow-hidden flex flex-col hover:shadow-lifted dark:hover:shadow-lifted-dark transition-shadow"
         >
-          <div className="aspect-[16/10] bg-gray-100 shrink-0 overflow-hidden">
+          <div className="aspect-[16/10] bg-gray-100 dark:bg-white/5 shrink-0 overflow-hidden">
             {n.image_url ? (
               <img
                 src={n.image_url}
@@ -734,10 +867,10 @@ function NewsView() {
                 className="w-full h-full object-cover"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center">
+              <div className="w-full h-full flex items-center justify-center dot-grid">
                 <Newspaper
                   size={26}
-                  className="text-gray-300"
+                  className="text-gray-300 dark:text-gray-600"
                   strokeWidth={1.5}
                 />
               </div>
@@ -745,20 +878,20 @@ function NewsView() {
           </div>
           <div className="p-5 flex flex-col flex-1">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-[11px] uppercase tracking-wide font-medium text-green-700 bg-green-400/10 rounded-full px-2 py-0.5">
+              <span className="text-[10px] font-mono uppercase tracking-wider font-medium text-brand-green bg-brand-green/10 border border-brand-green/20 rounded-full px-2 py-0.5">
                 {n.type}
               </span>
-              <span className="text-xs text-gray-400">
+              <span className="text-xs font-mono text-gray-400">
                 {new Date(n.created_at).toLocaleDateString([], {
                   month: "short",
                   day: "numeric",
                 })}
               </span>
             </div>
-            <h3 className="text-base font-medium leading-snug line-clamp-2 min-h-[2.75rem]">
+            <h3 className="text-base font-medium leading-snug line-clamp-2 min-h-[2.75rem] text-gray-900 dark:text-white">
               {n.title}
             </h3>
-            <p className="text-sm text-gray-500 mt-2 leading-relaxed line-clamp-3">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 leading-relaxed line-clamp-3">
               {n.body}
             </p>
           </div>
@@ -794,72 +927,71 @@ function AvatarUploadModal({ session, refreshProfile, signOut }: any) {
     setPreview(URL.createObjectURL(selected));
   };
 
-  
-const onUpload = async () => {
-  if (!file) return;
-  setUploading(true);
-  setError("");
+  const onUpload = async () => {
+    if (!file) return;
+    setUploading(true);
+    setError("");
 
-  try {
-    const token = session?.access_token;
-    if (!token) {
-      throw new Error("You're not signed in — please sign in again.");
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not signed in.");
+
+      const ext = file.name.split(".").pop();
+      const filePath = `${user.id}/${Date.now()}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(filePath, file, { upsert: true, contentType: file.type });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from("avatars")
+        .getPublicUrl(filePath);
+
+      const { error: dbError } = await supabase
+        .from("users")
+        .update({ avatar_url: urlData.publicUrl })
+        .eq("id", user.id);
+
+      if (dbError) throw dbError;
+
+      await refreshProfile();
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || "An error occurred during upload.");
+    } finally {
+      setUploading(false);
     }
-
-    const formData = new FormData();
-    formData.append("avatar", file);
-
-    const res = await fetch(`${BACKEND_URL}/api/users/avatar`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      body: formData,
-    });
-
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || `Upload failed (status ${res.status})`);
-    }
-
-    await refreshProfile();
-  } catch (err: any) {
-    console.error(err);
-    setError(err.message || "An error occurred during upload.");
-  } finally {
-    setUploading(false);
-  }
-};
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-      <div className="relative w-full max-w-md bg-white rounded-3xl border border-gray-100 p-6 sm:p-8 shadow-2xl overflow-hidden flex flex-col items-center">
-        {/* Decorative Grid Background */}
-        <div className="absolute inset-0 opacity-[0.02] pointer-events-none">
-          <GridBackground size={24} />
+      <div className="relative w-full max-w-md glass-panel rounded-3xl shadow-lifted dark:shadow-lifted-dark p-6 sm:p-8 overflow-hidden flex flex-col items-center">
+        <div className="absolute inset-0 dot-grid opacity-60 pointer-events-none" />
+
+        <div className="w-12 h-12 rounded-2xl bg-brand-green/10 border border-brand-green/20 flex items-center justify-center mb-5 relative shadow-glow">
+          <Camera className="text-brand-green" size={22} />
         </div>
 
-        <div className="w-12 h-12 rounded-2xl bg-green-50 flex items-center justify-center mb-5 relative">
-          <Camera className="text-green-600" size={22} />
-        </div>
-
-        <h2 className="text-xl font-medium text-center mb-2">
+        <h2 className="relative text-xl font-medium text-center mb-2 text-gray-900 dark:text-white">
           Upload Profile Picture
         </h2>
-        <p className="text-sm text-gray-500 text-center mb-6 leading-relaxed">
+        <p className="relative text-sm text-gray-500 dark:text-gray-400 text-center mb-6 leading-relaxed">
           To finalize your account setup, please upload a clear, high-quality
           portrait of yourself. This is required for course rosters and exams.
         </p>
 
         {error && (
-          <div className="w-full flex items-start gap-2 bg-red-50 text-red-600 text-xs rounded-xl px-4 py-3 mb-5">
+          <div className="relative w-full flex items-start gap-2 bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 text-xs rounded-xl px-4 py-3 mb-5">
             <AlertCircle size={14} className="shrink-0 mt-0.5" />
             <span>{error}</span>
           </div>
         )}
 
-        {/* Upload Dropzone */}
-        <div className="w-full aspect-square max-w-[200px] border-2 border-dashed border-gray-200 rounded-3xl overflow-hidden relative group flex flex-col items-center justify-center bg-gray-50 hover:bg-gray-100/50 hover:border-green-400 transition cursor-pointer mb-6">
+        <div className="relative w-full aspect-square max-w-[200px] border-2 border-dashed border-gray-200 dark:border-white/15 rounded-3xl overflow-hidden group flex flex-col items-center justify-center bg-gray-50 dark:bg-white/5 hover:bg-gray-100/50 dark:hover:bg-white/10 hover:border-brand-green transition cursor-pointer mb-6">
           {preview ? (
             <img
               src={preview}
@@ -870,7 +1002,7 @@ const onUpload = async () => {
             <div className="flex flex-col items-center p-4">
               <User
                 size={36}
-                className="text-gray-300 group-hover:text-green-400 transition mb-2"
+                className="text-gray-300 dark:text-gray-600 group-hover:text-brand-green transition mb-2"
                 strokeWidth={1.5}
               />
               <span className="text-xs text-gray-400 group-hover:text-gray-500 transition text-center font-medium">
@@ -887,11 +1019,11 @@ const onUpload = async () => {
           />
         </div>
 
-        <div className="w-full space-y-3">
+        <div className="relative w-full space-y-3">
           <button
             onClick={onUpload}
             disabled={!file || uploading}
-            className="w-full bg-[#0a0a0a] text-white rounded-full py-3 text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full bg-[#0a0a0a] dark:bg-white text-white dark:text-[#0a0a0a] rounded-full py-3 text-sm font-medium hover:bg-gray-800 dark:hover:bg-gray-100 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-soft dark:shadow-soft-dark"
           >
             {uploading ? (
               <>
@@ -909,7 +1041,7 @@ const onUpload = async () => {
           <button
             onClick={() => signOut()}
             disabled={uploading}
-            className="w-full flex items-center justify-center gap-2 text-sm text-gray-500 hover:text-red-500 transition py-2 font-medium"
+            className="w-full flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-red-500 transition py-2 font-medium"
           >
             <LogOut size={14} />
             Sign out of portal

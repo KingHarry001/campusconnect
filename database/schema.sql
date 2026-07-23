@@ -37,7 +37,6 @@ create table public.users (
   created_at timestamptz default now()
 );
 
--- Enable RLS for users
 alter table public.users enable row level security;
 
 -- Helper functions to check roles (security definer to avoid RLS recursion)
@@ -61,7 +60,8 @@ $$ language plpgsql;
 
 -- Policies for users
 create policy "users_select_own" on public.users for select using (auth.uid() = id);
-create policy "users_select_all" on public.users for select using (true); -- let everyone see lecturers/students for complaints & lookups
+-- Tightened: authenticated users only can browse the directory (no anonymous scraping)
+create policy "users_select_all" on public.users for select using (auth.role() = 'authenticated');
 create policy "users_insert_self" on public.users for insert with check (auth.uid() = id);
 create policy "users_update_own" on public.users for update using (auth.uid() = id);
 create policy "users_admin_all" on public.users for all using (public.is_admin());
@@ -102,14 +102,14 @@ create table public.classes (
   id uuid primary key default gen_random_uuid(),
   course_id uuid references public.courses(id) on delete cascade not null,
   day text not null check (day in ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')),
-  start_time text not null, -- format "HH:MM"
-  end_time text not null, -- format "HH:MM"
+  start_time text not null,
+  end_time text not null,
   location_id uuid references public.locations(id) on delete set null,
-  venue text, -- custom venue override
+  venue text,
   building text,
   latitude double precision,
   longitude double precision,
-  attendance_radius double precision default 50.0, -- in meters
+  attendance_radius double precision default 50.0,
   created_at timestamptz default now()
 );
 
@@ -123,15 +123,15 @@ create policy "classes_lecturer_all" on public.classes for all using (
 );
 create policy "classes_admin_all" on public.classes for all using (public.is_admin());
 
--- 5. Attendance Sessions (Instance created by lecturer to unlock check-in)
+-- 5. Attendance Sessions
 create table public.attendance_sessions (
   id uuid primary key default gen_random_uuid(),
   class_id uuid references public.classes(id) on delete cascade not null,
   opens_at timestamptz not null,
   closes_at timestamptz not null,
   is_test boolean default false,
-  latitude double precision, -- override coordinate
-  longitude double precision, -- override coordinate
+  latitude double precision,
+  longitude double precision,
   radius double precision default 50.0,
   created_at timestamptz default now()
 );
@@ -180,7 +180,7 @@ create table public.assignments (
   description text,
   deadline timestamptz not null,
   marks integer default 100,
-  file_url text, -- optional attachment
+  file_url text,
   created_at timestamptz default now()
 );
 
@@ -228,7 +228,7 @@ create table public.announcements (
   type text check (type in ('announcement', 'news', 'insight')) default 'announcement',
   image_url text,
   target_role text check (target_role in ('everyone', 'student', 'lecturer')) default 'everyone',
-  target_level text, -- e.g. "200" level only
+  target_level text,
   target_course_id uuid references public.courses(id) on delete cascade,
   scheduled_for timestamptz default now(),
   created_at timestamptz default now()
@@ -311,7 +311,7 @@ begin
     coalesce(new.raw_user_meta_data->>'full_name', ''),
     new.email,
     coalesce(new.raw_user_meta_data->>'role', 'student'),
-    case 
+    case
       when coalesce(new.raw_user_meta_data->>'role', 'student') = 'lecturer' then 'pending_approval'
       else 'active'
     end,
@@ -327,7 +327,6 @@ begin
 end;
 $$ language plpgsql security definer;
 
--- Connect Auth trigger
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
@@ -335,14 +334,12 @@ create trigger on_auth_user_created
 
 -- --- SEED DATA -------------------------------------------------------------
 
--- Seed Locations (Engineering Buildings / Labs)
 insert into public.locations (name, building, latitude, longitude) values
 ('Engr. Lecture Hall 1', 'Faculty of Engineering Building', 6.90385, 3.92981),
 ('Engr. Lecture Hall 2', 'Faculty of Engineering Building', 6.90390, 3.92985),
 ('CPE Lab A', 'Computer Engineering Block', 6.90375, 3.92975),
 ('CPE Lab B', 'Computer Engineering Block', 6.90370, 3.92970);
 
--- Seed Core Courses for Computer Engineering
 insert into public.courses (code, title, level, semester, session) values
 ('CPE 201', 'Circuit Theory I', '200', 1, '2025/2026'),
 ('CPE 203', 'Introduction to Computer Engineering', '200', 1, '2025/2026'),
@@ -353,7 +350,6 @@ insert into public.courses (code, title, level, semester, session) values
 ('CPE 401', 'Embedded Systems', '400', 1, '2025/2026'),
 ('CPE 501', 'Advanced Computer Architecture', '500', 1, '2025/2026');
 
--- Seed FAQs for AI knowledge RAG
 insert into public.faqs (question, answer, category) values
 ('Who teaches CPE 201?', 'CPE 201 (Circuit Theory I) is taught by Dr. Adeyemi.', 'Academics'),
 ('Where is the Computer Engineering Department library?', 'The CPE department library is located on the first floor of the Engineering Building, Room 104.', 'Facilities'),
@@ -362,8 +358,71 @@ insert into public.faqs (question, answer, category) values
 ('What is the attendance policy?', 'Students are expected to maintain at least 75% attendance in all lectures to be eligible for examination.', 'Attendance'),
 ('How does GPS attendance check-in work?', 'When a lecturer starts an attendance session, click the "Mark Attendance" button on your dashboard. Ensure your device GPS is turned on and that you are inside the classroom (within 50-100 meters of the class location).', 'Attendance');
 
--- Seed initial settings
 insert into public.system_settings (key, value) values
 ('default_attendance_radius_meters', '50'),
 ('allow_student_self_registration', 'true'),
 ('academic_calendar', '{"semester": 1, "session": "2025/2026", "exam_start_date": "2026-09-14"}');
+
+
+-- --- STORAGE BUCKETS & POLICIES --------------------------------------------
+-- Idempotent: safe to re-run without "already exists" errors, since
+-- storage.objects is never dropped by the table cleanup above.
+
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do nothing;
+
+insert into storage.buckets (id, name, public)
+values ('submissions', 'submissions', true)
+on conflict (id) do nothing;
+
+drop policy if exists "users_upload_own_avatar" on storage.objects;
+create policy "users_upload_own_avatar" on storage.objects
+for insert with check (
+  bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text
+);
+
+drop policy if exists "users_update_own_avatar" on storage.objects;
+create policy "users_update_own_avatar" on storage.objects
+for update using (
+  bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text
+);
+
+drop policy if exists "anyone_reads_avatars" on storage.objects;
+create policy "anyone_reads_avatars" on storage.objects
+for select using (bucket_id = 'avatars');
+
+drop policy if exists "students_upload_own_submissions" on storage.objects;
+create policy "students_upload_own_submissions" on storage.objects
+for insert with check (
+  bucket_id = 'submissions' and (storage.foldername(name))[1] = auth.uid()::text
+);
+
+drop policy if exists "anyone_reads_submissions" on storage.objects;
+create policy "anyone_reads_submissions" on storage.objects
+for select using (bucket_id = 'submissions');
+
+create or replace function public.prevent_role_self_escalation()
+returns trigger as $$
+begin
+  if not public.is_admin() then
+    new.role := old.role;
+    new.status := old.status;
+  end if;
+  return new;
+end;
+$$ language plpgsql security definer;
+
+drop trigger if exists lock_role_status_on_self_update on public.users;
+create trigger lock_role_status_on_self_update
+  before update on public.users
+  for each row execute procedure public.prevent_role_self_escalation();
+
+
+  -- Fix announcement type mismatch (UI offers 'alert', schema didn't allow it)
+alter table public.announcements drop constraint if exists announcements_type_check;
+alter table public.announcements add constraint announcements_type_check
+  check (type in ('announcement', 'news', 'insight', 'alert'));
+
+-- Assignment deadline: UI treats it as optional, schema required it
+alter table public.assignments alter column deadline drop not null;.

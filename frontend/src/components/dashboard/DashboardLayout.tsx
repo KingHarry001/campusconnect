@@ -1,186 +1,175 @@
+// src/components/dashboard/DashboardLayout.tsx
 "use client";
 
-import { ReactNode } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { LucideIcon, LogOut, Menu, X } from "lucide-react";
 import { useState } from "react";
+import { LucideIcon, ChevronDown } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { useRouter } from "next/navigation";
-import GridBackground from "@/components/ui/GridBackground";
+import ProfileDrawer from "@/components/dashboard/ProfileDrawer";
 
-interface Tab {
-  key: string;
-  label: string;
-  icon: LucideIcon;
-}
-
+interface Tab { key: string; label: string; icon: LucideIcon; }
 interface DashboardLayoutProps {
-  tabs: Tab[];
+  tabs: Tab[];              // primary — max 4, shown in mobile bottom bar + desktop sidebar
+  secondaryTabs?: Tab[];    // overflow — desktop: "More" section in sidebar. Mobile: drawer only.
   active: string;
   setActive: (key: string) => void;
   title: string;
-  portalLabel?: string;
-  children: ReactNode;
+  portalLabel: string;
+  children: React.ReactNode;
 }
 
 export default function DashboardLayout({
-  tabs,
-  active,
-  setActive,
-  title,
-  portalLabel = "OOU · Computer Engineering",
-  children,
+  tabs, secondaryTabs = [], active, setActive, title, portalLabel, children,
 }: DashboardLayoutProps) {
-  const { profile, signOut } = useAuth();
-  const router = useRouter();
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const { profile } = useAuth();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
 
-  const handleSignOut = async () => {
-    await signOut();
-    router.push("/signin");
-  };
-
-  const initials = profile?.full_name
-    ? profile.full_name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase()
-    : "?";
+  const isSecondaryActive = secondaryTabs.some((t) => t.key === active);
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-white">
-      {/* Sidebar */}
-      <aside
-        className={`${mobileOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0
-          fixed md:sticky top-0 left-0 z-40 h-screen w-64 flex flex-col bg-[#0a0a0a] text-white
-          transition-transform duration-300 ease-in-out overflow-hidden`}
-      >
-        <GridBackground size={48} />
-        {/* Header */}
-        <div className="relative flex items-center gap-3 px-6 py-7 border-b border-white/5">
-          <img
-            src="/oou-crest.jpg"
-            alt="OOU"
-            className="h-8 w-8 object-contain rounded-full"
-          />
-          <div className="leading-tight">
-            <p className="text-sm font-medium">Campus Connect</p>
-            <p className="text-xs text-white/40">{portalLabel}</p>
-          </div>
-        </div>
+    <div className="flex min-h-screen bg-white dark:bg-[#0a0a0a] transition-colors dot-grid">
+      {/* Desktop sidebar */}
+      <aside className="w-72 shrink-0 hidden lg:flex lg:flex-col justify-between p-4">
+        <div className="glass-panel rounded-3xl shadow-lifted dark:shadow-lifted-dark px-5 py-7 flex flex-col h-full">
+          <div className="flex-1 overflow-y-auto">
+            <div className="flex items-center gap-3 mb-10 px-1">
+              <img src="/oou-crest.jpg" alt="" className="h-10 w-10 object-contain rounded-full ring-2 ring-brand-green/20" />
+              <div className="leading-tight">
+                <p className="font-medium text-sm text-gray-900 dark:text-white">Campus Connect</p>
+                <p className="text-[11px] font-mono uppercase tracking-wider text-brand-green">{portalLabel}</p>
+              </div>
+            </div>
 
-        {/* Nav tabs */}
-        <nav className="relative flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = active === tab.key;
-            return (
-              <button
-                key={tab.key}
-                onClick={() => {
-                  setActive(tab.key);
-                  setMobileOpen(false);
-                }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-all text-left
-                  ${
-                    isActive
-                      ? "bg-white/10 text-white"
-                      : "text-white/50 hover:text-white hover:bg-white/5"
-                  }`}
-              >
-                <Icon size={18} strokeWidth={1.5} />
-                {tab.label}
-                {isActive && (
-                  <span className="ml-auto h-1.5 w-1.5 rounded-full bg-green-400" />
+            <nav className="flex flex-col gap-1.5">
+              {tabs.map(({ key, label, icon: Icon }) => {
+                const isActive = active === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setActive(key)}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-all text-left ${
+                      isActive
+                        ? "bg-brand-green/10 dark:bg-brand-green/15 text-brand-green shadow-glow"
+                        : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5"
+                    }`}
+                  >
+                    <Icon size={18} strokeWidth={isActive ? 2 : 1.75} />
+                    {label}
+                  </button>
+                );
+              })}
+            </nav>
+
+            {/* Secondary tabs — collapsible "More" section, desktop only.
+                Auto-expands if a secondary tab is the current active one. */}
+            {secondaryTabs.length > 0 && (
+              <div className="mt-2">
+                <button
+                  onClick={() => setMoreOpen((v) => !v)}
+                  className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-mono uppercase tracking-wider text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition"
+                >
+                  More
+                  <ChevronDown size={14} className={`transition-transform ${moreOpen || isSecondaryActive ? "rotate-180" : ""}`} />
+                </button>
+                {(moreOpen || isSecondaryActive) && (
+                  <nav className="flex flex-col gap-1.5 mt-1">
+                    {secondaryTabs.map(({ key, label, icon: Icon }) => {
+                      const isActive = active === key;
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => setActive(key)}
+                          className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-all text-left ${
+                            isActive
+                              ? "bg-brand-green/10 dark:bg-brand-green/15 text-brand-green shadow-glow"
+                              : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5"
+                          }`}
+                        >
+                          <Icon size={18} strokeWidth={isActive ? 2 : 1.75} />
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </nav>
                 )}
-              </button>
-            );
-          })}
-        </nav>
+              </div>
+            )}
+          </div>
 
-        {/* User info + sign out */}
-        <div className="relative border-t border-white/5 px-4 py-4">
-          <div className="flex items-center gap-3 px-2 py-2 rounded-2xl hover:bg-white/5 transition group">
-            <div className="h-9 w-9 rounded-xl bg-green-400/20 flex items-center justify-center text-green-400 text-xs font-bold shrink-0 overflow-hidden border border-white/10">
-              {profile?.avatar_url ? (
-                <img
-                  src={profile.avatar_url}
-                  alt=""
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                initials
-              )}
+          <div className="trace-divider mb-4 mt-4" />
+
+          <button
+            onClick={() => setDrawerOpen(true)}
+            className="flex items-center gap-3 px-3 py-3 hover:bg-gray-50 dark:hover:bg-white/5 rounded-2xl transition text-left shadow-soft dark:shadow-soft-dark bg-white/50 dark:bg-white/[0.03]"
+          >
+            <div className="h-9 w-9 rounded-full bg-gray-100 dark:bg-white/10 ring-2 ring-brand-green/20 flex items-center justify-center text-sm font-medium overflow-hidden text-gray-900 dark:text-white">
+              {profile?.avatar_url ? <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" /> : profile?.full_name?.[0] || "?"}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate leading-tight">
-                {profile?.full_name || "—"}
-              </p>
-              <p className="text-xs text-white/55 truncate mt-0.5 leading-none">
-                {profile?.email || "—"}
-              </p>
-              <p className="text-[10px] text-green-400/80 font-medium uppercase tracking-wider mt-1.5 leading-none">
-                {profile?.role}
-              </p>
+              <p className="text-sm font-medium truncate text-gray-900 dark:text-white">{profile?.full_name}</p>
+              <p className="text-[11px] font-mono text-gray-400 truncate">{profile?.email}</p>
             </div>
-            <button
-              onClick={handleSignOut}
-              title="Sign out"
-              className="opacity-0 group-hover:opacity-100 transition text-white/40 hover:text-white"
-            >
-              <LogOut size={16} />
-            </button>
-          </div>
+          </button>
         </div>
       </aside>
 
-      {/* Mobile overlay */}
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-30 md:hidden"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
-
-      {/* Main content */}
-      <div className="flex-1 min-w-0 flex flex-col">
-        {/* Top bar (mobile only) */}
-        <header className="md:hidden flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <div className="flex items-center gap-2">
-            <img
-              src="/oou-crest.jpg"
-              alt="OOU"
-              className="h-7 w-7 object-contain"
-            />
-            <span className="text-sm font-medium">{title}</span>
+      <div className="flex-1 flex flex-col min-h-screen">
+        {/* Mobile top bar */}
+        <header className="lg:hidden flex items-center justify-between px-5 py-4 sticky top-0 z-20 glass-panel border-x-0 border-t-0 rounded-none shadow-soft dark:shadow-soft-dark">
+          <div className="flex items-center gap-2.5">
+            <img src="/oou-crest.jpg" alt="" className="h-8 w-8 object-contain rounded-full ring-2 ring-brand-green/20" />
+            <div className="leading-tight">
+              <p className="font-medium text-sm text-gray-900 dark:text-white">{title}</p>
+              <p className="text-[10px] font-mono uppercase tracking-wider text-brand-green">{portalLabel}</p>
+            </div>
           </div>
           <button
-            onClick={() => setMobileOpen(true)}
-            className="p-2 rounded-xl hover:bg-gray-100 transition"
+            onClick={() => setDrawerOpen(true)}
+            className="h-8 w-8 rounded-full bg-gray-100 dark:bg-white/10 ring-2 ring-brand-green/20 flex items-center justify-center text-xs font-medium overflow-hidden text-gray-900 dark:text-white"
+            aria-label="Open profile menu"
           >
-            <Menu size={20} />
+            {profile?.avatar_url ? <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" /> : profile?.full_name?.[0] || "?"}
           </button>
         </header>
 
-        {/* Page heading */}
-        <div className="px-6 md:px-10 pt-8 pb-2">
-          <h1 className="text-2xl md:text-3xl font-semibold">{title}</h1>
-          <p className="text-sm text-gray-400 mt-1">
-            {new Date().toLocaleDateString("en-US", {
-              weekday: "long",
-              month: "long",
-              day: "numeric",
-              year: "numeric",
-            })}
-          </p>
-        </div>
+        <header className="hidden lg:flex items-center justify-between px-12 pt-10">
+          <div>
+            <h1 className="text-2xl font-medium text-gray-900 dark:text-white">{title}</h1>
+            <p className="text-xs font-mono text-gray-400 mt-1">{portalLabel.toLowerCase()}</p>
+          </div>
+        </header>
 
-        {/* Content */}
-        <main className="flex-1 px-6 md:px-10 py-6">{children}</main>
+        <main className="flex-1 px-4 sm:px-6 lg:px-12 py-6 lg:py-10 pb-28 lg:pb-10 max-w-5xl w-full">
+          {children}
+        </main>
+
+        {/* Mobile bottom nav — strictly the 4 primary tabs, never secondary ones */}
+        <nav className="lg:hidden fixed bottom-4 left-4 right-4 z-30 glass-panel rounded-3xl shadow-lifted dark:shadow-lifted-dark px-1 py-2">
+          <div className="flex justify-between">
+            {tabs.map(({ key, label, icon: Icon }) => {
+              const isActive = active === key;
+              return (
+                <button key={key} onClick={() => setActive(key)} className="flex-1 flex flex-col items-center gap-1 py-1.5 px-1">
+                  <div className={`p-1.5 rounded-xl transition ${isActive ? "bg-brand-green/15 shadow-glow" : ""}`}>
+                    <Icon size={18} strokeWidth={isActive ? 2 : 1.5} className={isActive ? "text-brand-green" : "text-gray-400"} />
+                  </div>
+                  <span className={`text-[10px] leading-none text-center ${isActive ? "text-brand-green font-medium" : "text-gray-400"}`}>
+                    {label.split(" ")[0]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </nav>
       </div>
+
+      <ProfileDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        secondaryTabs={secondaryTabs}
+        active={active}
+        onSelectTab={setActive}
+      />
     </div>
   );
 }

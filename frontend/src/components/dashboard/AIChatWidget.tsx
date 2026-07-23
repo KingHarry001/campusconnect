@@ -12,7 +12,11 @@ interface Message {
 export default function AIChatWidget() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: "Hi! I'm the CPE Portal AI. Ask me about schedules, assignments, lecturers, or anything about the department." },
+    {
+      role: "assistant",
+      content:
+        "Hi! I'm the CPE Portal AI. Ask me about schedules, assignments, lecturers, or anything about the department.",
+    },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -32,7 +36,9 @@ export default function AIChatWidget() {
     setLoading(true);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       const token = session?.access_token;
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
@@ -50,15 +56,21 @@ export default function AIChatWidget() {
         throw new Error(errBody.error || `Server error ${res.status}`);
       }
       const body = await res.json();
-      setMessages((prev) => [...prev, {
-        role: "assistant",
-        content: body.reply || "Sorry, I couldn't get a response right now.",
-      }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: body.reply || "Sorry, I couldn't get a response right now.",
+        },
+      ]);
     } catch {
-      setMessages((prev) => [...prev, {
-        role: "assistant",
-        content: "Network error. Please check your connection.",
-      }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: "Network error. Please check your connection.",
+        },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -69,7 +81,9 @@ export default function AIChatWidget() {
       {/* Floating button */}
       <button
         onClick={() => setOpen(true)}
-        className={`fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full bg-[#0a0a0a] text-white shadow-xl flex items-center justify-center hover:scale-105 transition-transform ${open ? "hidden" : "flex"}`}
+        className={`fixed bottom-20 lg:bottom-6 right-6 z-40 h-14 w-14 rounded-full bg-[#0a0a0a] text-white shadow-xl flex items-center justify-center hover:scale-105 transition-transform ${
+          open ? "hidden" : "flex"
+        }`}
         aria-label="Open AI assistant"
       >
         <Bot size={22} />
@@ -78,8 +92,10 @@ export default function AIChatWidget() {
 
       {/* Chat panel */}
       {open && (
-        <div className="fixed bottom-6 right-6 z-50 w-[360px] max-w-[calc(100vw-2rem)] bg-white rounded-3xl shadow-2xl border border-gray-100 flex flex-col overflow-hidden"
-          style={{ height: "520px" }}>
+        <div
+          className="fixed bottom-6 right-6 z-50 w-[360px] max-w-[calc(100vw-2rem)] bg-white rounded-3xl shadow-2xl border border-gray-100 flex flex-col overflow-hidden"
+          style={{ height: "520px" }}
+        >
           {/* Header */}
           <div className="flex items-center gap-3 px-5 py-4 bg-[#0a0a0a] text-white">
             <div className="h-9 w-9 rounded-xl bg-green-400/20 flex items-center justify-center">
@@ -87,7 +103,9 @@ export default function AIChatWidget() {
             </div>
             <div className="flex-1">
               <p className="text-sm font-medium">CPE AI Assistant</p>
-              <p className="text-xs text-white/40">Powered by Groq · Context-aware</p>
+              <p className="text-xs text-white/40">
+                Powered by Groq · Context-aware
+              </p>
             </div>
             <button
               onClick={() => setOpen(false)}
@@ -102,13 +120,16 @@ export default function AIChatWidget() {
             {messages.map((msg, i) => (
               <div
                 key={i}
-                className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                className={`flex ${
+                  msg.role === "user" ? "justify-end" : "justify-start"
+                }`}
               >
                 <div
                   className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap
-                    ${msg.role === "user"
-                      ? "bg-[#0a0a0a] text-white rounded-br-sm"
-                      : "bg-gray-100 text-gray-800 rounded-bl-sm"
+                    ${
+                      msg.role === "user"
+                        ? "bg-[#0a0a0a] text-white rounded-br-sm"
+                        : "bg-gray-100 text-gray-800 rounded-bl-sm"
                     }`}
                 >
                   {msg.content}
@@ -126,7 +147,10 @@ export default function AIChatWidget() {
           </div>
 
           {/* Input */}
-          <form onSubmit={sendMessage} className="px-4 py-3 border-t border-gray-100 flex items-center gap-2">
+          <form
+            onSubmit={sendMessage}
+            className="px-4 py-3 border-t border-gray-100 flex items-center gap-2"
+          >
             <input
               type="text"
               value={input}

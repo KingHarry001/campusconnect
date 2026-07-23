@@ -5,7 +5,7 @@ const path = require('path');
 const connectionString = "postgresql://postgres.tcpzenciiykmdhzrhamb:T7FDvcwBSTCUfxeq@aws-1-eu-north-1.pooler.supabase.com:5432/postgres";
 
 async function run() {
-  const sqlPath = path.join(__dirname, 'schema.sql');
+  const sqlPath = path.join(__dirname, '002_lock_role_status.sql');
   const sql = fs.readFileSync(sqlPath, 'utf8');
 
   const client = new Client({
