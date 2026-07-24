@@ -32,20 +32,19 @@ export default function SignInPage() {
       return;
     }
 
-    // Change .single() to .maybeSingle()
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile } = await supabase
       .from("users")
-      .select("role, status")
+      .select("role, status, phone, level, matric_number, staff_id")
       .eq("id", data.user.id)
       .maybeSingle();
 
     setLoading(false);
 
-    // Safety check: What if the profile doesn't exist at all?
+    // No profile row exists at all — the handle_new_user() trigger never ran
+    // (or ran before required fields existed). Send them to complete it
+    // instead of dead-ending here.
     if (!profile) {
-      setError("Your profile setup is incomplete. Please contact the administrator.");
-      // Optional: Sign them back out if they shouldn't be here
-      // await supabase.auth.signOut();
+      router.push("/signup?resume=true");
       return;
     }
 
@@ -53,6 +52,19 @@ export default function SignInPage() {
       setError("This account has been suspended. Contact department admin.");
       return;
     }
+
+    // Profile row exists but is missing required fields for its role —
+    // same resume flow, now pre-filled instead of created from scratch.
+    const missingRequiredFields =
+      !profile.phone ||
+      (profile.role === "student" && (!profile.level || !profile.matric_number)) ||
+      (profile.role === "lecturer" && !profile.staff_id);
+
+    if (missingRequiredFields) {
+       router.push("/signup?resume=true");
+      return;
+    }
+
     if (profile.status === "pending_approval") {
       router.push("/pending-approval");
       return;

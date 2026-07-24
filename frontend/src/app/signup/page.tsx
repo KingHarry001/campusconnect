@@ -1,7 +1,7 @@
 // src/app/signup/page.tsx
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
@@ -35,7 +35,6 @@ const MATRIC_PATTERN = /^[A-Z]{3}\/\d{2}\/\d{2}\/\d{4}$/;
 
 function formatMatricNumber(raw: string): string {
   const clean = raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
-
   let letters = "";
   let rest = "";
   for (const ch of clean) {
@@ -45,12 +44,10 @@ function formatMatricNumber(raw: string): string {
       rest += ch;
     }
   }
-
   const digits = rest.replace(/[^0-9]/g, "").slice(0, 8);
   const year1 = digits.slice(0, 2);
   const year2 = digits.slice(2, 4);
   const serial = digits.slice(4, 8);
-
   let out = letters;
   if (year1) out += "/" + year1;
   if (year2) out += "/" + year2;
@@ -61,15 +58,63 @@ function formatMatricNumber(raw: string): string {
 function SignUpForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const role = searchParams.get("role") === "lecturer" ? "lecturer" : "student";
+  const resume = searchParams.get("resume") === "true";
+  const paramRole = searchParams.get("role") === "lecturer" ? "lecturer" : "student";
 
-  const [step, setStep] = useState<1 | 2>(1);
+  // In resume mode the role comes from the account's existing metadata/profile
+  // once loaded, not the URL — this local state holds that once fetched.
+  const [resumeRole, setResumeRole] = useState<"student" | "lecturer">(paramRole);
+  const role = resume ? resumeRole : paramRole;
+
+  const [step, setStep] = useState<1 | 2>(resume ? 2 : 1);
+  const [resumeLoading, setResumeLoading] = useState(resume);
+  const [authUserId, setAuthUserId] = useState<string | null>(null);
+  const [existingStatus, setExistingStatus] = useState<string | null>(null);
+
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const update = (patch: Partial<FormState>) => setForm((prev) => ({ ...prev, ...patch }));
+
+  // Resume mode: pull whatever the account already has (auth metadata plus
+  // any partial public.users row) and pre-fill the form, skipping straight
+  // to step 2 since the account itself already exists.
+  useEffect(() => {
+    if (!resume) return;
+
+    const load = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push("/signin");
+        return;
+      }
+      setAuthUserId(user.id);
+
+      const { data: profile } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      setExistingStatus(profile?.status ?? null);
+      setResumeRole((profile?.role || user.user_metadata?.role || "student") as "student" | "lecturer");
+
+      update({
+        fullName: profile?.full_name || user.user_metadata?.full_name || "",
+        email: user.email || "",
+        level: profile?.level || user.user_metadata?.level || "100",
+        phone: profile?.phone || "",
+        matricNumber: profile?.matric_number || "",
+        staffId: profile?.staff_id || "",
+        office: profile?.office || "",
+      });
+
+      setResumeLoading(false);
+    };
+    load();
+  }, [resume, router]);
 
   const validateStepOne = () => {
     if (!form.fullName.trim()) {
@@ -121,6 +166,49 @@ function SignUpForm() {
     }
 
     setLoading(true);
+
+    if (resume) {
+      // Account already exists — no signUp() call, just fill/repair the
+      // public.users row for this already-authenticated user.
+      const payload = {
+        id: authUserId,
+        full_name: form.fullName.trim(),
+        email: form.email,
+        role,
+        status: existingStatus || (role === "lecturer" ? "pending_approval" : "active"),
+        phone: form.phone.trim(),
+        level: role === "student" ? form.level : null,
+        matric_number: role === "student" ? form.matricNumber.trim() : null,
+        staff_id: role === "lecturer" ? form.staffId.trim() : null,
+        office: role === "lecturer" ? form.office.trim() || null : null,
+      };
+
+      const { error: upsertError } = await supabase
+        .from("users")
+        .upsert(payload, { onConflict: "id" });
+
+      setLoading(false);
+
+      if (upsertError) {
+        if (upsertError.message.toLowerCase().includes("duplicate")) {
+          setError(
+            role === "student"
+              ? "That matric number is already registered."
+              : "That staff ID is already registered."
+          );
+        } else {
+          setError(upsertError.message);
+        }
+        return;
+      }
+
+      if (payload.status === "pending_approval") router.push("/pending-approval");
+      else if (role === "lecturer") router.push("/lecturer/dashboard");
+      else router.push("/student/dashboard");
+      return;
+    }
+
+    // Normal, brand-new sign-up path — unchanged from before.
     const { error: signUpError } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
@@ -154,6 +242,14 @@ function SignUpForm() {
     router.push(role === "lecturer" ? "/pending-approval" : "/student/dashboard");
   };
 
+  if (resumeLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-[#0a0a0a]">
+        <Loader2 size={20} className="animate-spin text-gray-400" />
+      </div>
+    );
+  }
+
   const renderSteps = (idSuffix: string) => (
     <>
       {error && (
@@ -163,7 +259,7 @@ function SignUpForm() {
       )}
 
       <AnimatePresence mode="wait" initial={false}>
-        {step === 1 ? (
+        {step === 1 && !resume ? (
           <motion.form
             key="step1"
             initial={{ opacity: 0, x: -16 }}
@@ -176,9 +272,7 @@ function SignUpForm() {
               <Link
                 href="/signup"
                 className={`flex-1 text-center py-3 transition ${
-                  role === "student"
-                    ? "bg-[#0a0a0a] dark:bg-white text-white dark:text-[#0a0a0a]"
-                    : "text-gray-600 dark:text-gray-400 dark:bg-white/5"
+                  role === "student" ? "bg-[#0a0a0a] dark:bg-white text-white dark:text-[#0a0a0a]" : "text-gray-600 dark:text-gray-400 dark:bg-white/5"
                 }`}
               >
                 Student
@@ -186,9 +280,7 @@ function SignUpForm() {
               <Link
                 href="/signup?role=lecturer"
                 className={`flex-1 text-center py-3 transition ${
-                  role === "lecturer"
-                    ? "bg-[#0a0a0a] dark:bg-white text-white dark:text-[#0a0a0a]"
-                    : "text-gray-600 dark:text-gray-400 dark:bg-white/5"
+                  role === "lecturer" ? "bg-[#0a0a0a] dark:bg-white text-white dark:text-[#0a0a0a]" : "text-gray-600 dark:text-gray-400 dark:bg-white/5"
                 }`}
               >
                 Lecturer
@@ -285,21 +377,49 @@ function SignUpForm() {
             transition={{ duration: 0.25, ease: "easeOut" }}
             onSubmit={handleSubmit}
           >
-            <button
-              type="button"
-              onClick={handleBack}
-              className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 mb-6 hover:text-gray-700 dark:hover:text-gray-200 transition"
-            >
-              <ArrowLeft size={15} />
-              Back
-            </button>
+            {!resume && (
+              <button
+                type="button"
+                onClick={handleBack}
+                className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 mb-6 hover:text-gray-700 dark:hover:text-gray-200 transition"
+              >
+                <ArrowLeft size={15} />
+                Back
+              </button>
+            )}
+
+            {resume && (
+              <>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                  Signed in as <span className="font-medium text-gray-900 dark:text-white">{form.email}</span>
+                </p>
+                <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">I am a</label>
+                <div className="flex rounded-xl border border-gray-200 dark:border-white/10 overflow-hidden mb-5 text-sm font-medium">
+                  <button
+                    type="button"
+                    onClick={() => setResumeRole("student")}
+                    className={`flex-1 text-center py-3 transition ${
+                      role === "student" ? "bg-[#0a0a0a] dark:bg-white text-white dark:text-[#0a0a0a]" : "text-gray-600 dark:text-gray-400"
+                    }`}
+                  >
+                    Student
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setResumeRole("lecturer")}
+                    className={`flex-1 text-center py-3 transition ${
+                      role === "lecturer" ? "bg-[#0a0a0a] dark:bg-white text-white dark:text-[#0a0a0a]" : "text-gray-600 dark:text-gray-400"
+                    }`}
+                  >
+                    Lecturer
+                  </button>
+                </div>
+              </>
+            )}
 
             {role === "student" ? (
               <>
-                <label
-                  className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200"
-                  htmlFor={`matricNumber-${idSuffix}`}
-                >
+                <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200" htmlFor={`matricNumber-${idSuffix}`}>
                   Matric number
                 </label>
                 <input
@@ -367,7 +487,7 @@ function SignUpForm() {
               className="w-full bg-brand-green text-white rounded-full py-4 text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2 mb-6 shadow-glow hover:bg-brand-green-dark transition"
             >
               {loading && <Loader2 size={16} className="animate-spin" />}
-              {loading ? "Creating account..." : "Create account"}
+              {loading ? (resume ? "Saving..." : "Creating account...") : resume ? "Finish setup" : "Create account"}
             </button>
           </motion.form>
         )}
@@ -386,16 +506,25 @@ function SignUpForm() {
             <span className="text-white font-medium text-sm">Campus Connect</span>
           </div>
           <h1 className="relative text-white text-2xl font-medium leading-tight">
-            Create your{" "}
-            <span className="font-voice italic font-normal text-green-400">account</span>
+            {resume ? (
+              <>Finish your <span className="font-voice italic font-normal text-green-400">setup</span></>
+            ) : (
+              <>Create your{" "}<span className="font-voice italic font-normal text-green-400">account</span></>
+            )}
           </h1>
           <p className="relative text-white/50 text-sm mt-2 font-mono">
-            {step === 1 ? "Sign up with your school email to get started." : "Just a couple more details."}
+            {resume
+              ? "A few details are missing from your registration."
+              : step === 1
+                ? "Sign up with your school email to get started."
+                : "Just a couple more details."}
           </p>
-          <div className="relative flex items-center gap-2 mt-6">
-            <div className={`h-1 flex-1 rounded-full transition-colors ${step >= 1 ? "bg-green-400" : "bg-white/15"}`} />
-            <div className={`h-1 flex-1 rounded-full transition-colors ${step >= 2 ? "bg-green-400" : "bg-white/15"}`} />
-          </div>
+          {!resume && (
+            <div className="relative flex items-center gap-2 mt-6">
+              <div className={`h-1 flex-1 rounded-full transition-colors ${step >= 1 ? "bg-green-400" : "bg-white/15"}`} />
+              <div className={`h-1 flex-1 rounded-full transition-colors ${step >= 2 ? "bg-green-400" : "bg-white/15"}`} />
+            </div>
+          )}
         </div>
 
         <div className="flex-1 px-6 pt-6 pb-10 overflow-hidden">
@@ -446,14 +575,23 @@ function SignUpForm() {
             transition={{ duration: 0.5, ease: "easeOut" }}
             className="w-full max-w-sm glass-panel rounded-3xl shadow-soft dark:shadow-soft-dark p-8"
           >
-            <h2 className="text-3xl font-medium mb-2 text-gray-900 dark:text-white">Create your account</h2>
+            <h2 className="text-3xl font-medium mb-2 text-gray-900 dark:text-white">
+              {resume ? "Finish your setup" : "Create your account"}
+            </h2>
             <p className="text-gray-500 dark:text-gray-400 mb-3">
-              {step === 1 ? "Sign up with your school email to get started." : "Just a couple more details."}
+              {resume
+                ? "A few details are missing from your registration."
+                : step === 1
+                  ? "Sign up with your school email to get started."
+                  : "Just a couple more details."}
             </p>
-            <div className="flex items-center gap-2 mb-8">
-              <div className={`h-1 flex-1 rounded-full transition-colors ${step >= 1 ? "bg-brand-green" : "bg-gray-100 dark:bg-white/10"}`} />
-              <div className={`h-1 flex-1 rounded-full transition-colors ${step >= 2 ? "bg-brand-green" : "bg-gray-100 dark:bg-white/10"}`} />
-            </div>
+            {!resume && (
+              <div className="flex items-center gap-2 mb-8">
+                <div className={`h-1 flex-1 rounded-full transition-colors ${step >= 1 ? "bg-brand-green" : "bg-gray-100 dark:bg-white/10"}`} />
+                <div className={`h-1 flex-1 rounded-full transition-colors ${step >= 2 ? "bg-brand-green" : "bg-gray-100 dark:bg-white/10"}`} />
+              </div>
+            )}
+            {resume && <div className="mb-8" />}
             {renderSteps("desktop")}
           </motion.div>
         </div>
