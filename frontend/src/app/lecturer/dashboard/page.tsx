@@ -35,14 +35,15 @@ const MORE_TABS = [
 /* ─── Shared skeleton block ─── */
 function SkeletonCard({ className = "" }: { className?: string }) {
   return (
-    <div className={`rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6 animate-pulse ${className}`}>
+    <div
+      className={`rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6 animate-pulse ${className}`}
+    >
       <div className="h-3 w-16 bg-gray-200 dark:bg-white/10 rounded-full mb-3" />
       <div className="h-4 w-2/3 bg-gray-200 dark:bg-white/10 rounded-full mb-2" />
       <div className="h-3 w-1/2 bg-gray-100 dark:bg-white/5 rounded-full" />
     </div>
   );
 }
-
 
 export default function LecturerDashboard() {
   const { profile } = useAuth();
@@ -120,22 +121,32 @@ function LecturerOverview({ profile }: any) {
         <div className="relative grid grid-cols-1 sm:grid-cols-3 gap-3">
           {loading
             ? [...Array(3)].map((_, i) => (
-                <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-4 min-h-[76px] animate-pulse">
+                <div
+                  key={i}
+                  className="bg-white/5 border border-white/10 rounded-2xl p-4 min-h-[76px] animate-pulse"
+                >
                   <div className="h-3 w-20 bg-white/10 rounded-full mb-2" />
                   <div className="h-5 w-10 bg-white/10 rounded-full" />
                 </div>
               ))
             : [
                 { label: "Courses assigned", value: String(stats.courses) },
-                { label: "Assignments published", value: String(stats.assignments) },
+                {
+                  label: "Assignments published",
+                  value: String(stats.assignments),
+                },
                 { label: "Open complaints", value: String(stats.complaints) },
               ].map((s) => (
                 <div
                   key={s.label}
                   className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-4 min-h-[76px] flex flex-col justify-between"
                 >
-                  <p className="text-xs text-white/40 mb-1 leading-snug">{s.label}</p>
-                  <p className="text-xl font-mono font-medium text-green-400">{s.value}</p>
+                  <p className="text-xs text-white/40 mb-1 leading-snug">
+                    {s.label}
+                  </p>
+                  <p className="text-xl font-mono font-medium text-green-400">
+                    {s.value}
+                  </p>
                 </div>
               ))}
         </div>
@@ -181,7 +192,8 @@ function MyClasses({ profile }: any) {
         .from("courses")
         .select("*, classes(*, locations(name, building))")
         .eq("lecturer_id", profile.id);
-      if (calendar) q = q.eq("session", calendar.session).eq("semester", calendar.semester);
+      if (calendar)
+        q = q.eq("session", calendar.session).eq("semester", calendar.semester);
       const { data } = await q;
       setCourses(data || []);
       setLoading(false);
@@ -193,18 +205,29 @@ function MyClasses({ profile }: any) {
     <div className="space-y-4">
       {courses.length === 0 ? (
         <div className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-16 flex flex-col items-center text-center">
-          <Calendar size={32} className="text-gray-200 dark:text-gray-700 mb-4" strokeWidth={1.5} />
-          <p className="text-gray-400">No courses assigned yet. Contact the administrator.</p>
+          <Calendar
+            size={32}
+            className="text-gray-200 dark:text-gray-700 mb-4"
+            strokeWidth={1.5}
+          />
+          <p className="text-gray-400">
+            No courses assigned yet. Contact the administrator.
+          </p>
         </div>
       ) : (
         courses.map((course: any) => (
-          <div key={course.id} className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6">
+          <div
+            key={course.id}
+            className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6"
+          >
             <div className="flex items-center justify-between mb-4">
               <div>
                 <span className="text-xs font-mono font-medium text-brand-green bg-brand-green/10 border border-brand-green/20 rounded-full px-2.5 py-1">
                   {course.code}
                 </span>
-                <h3 className="font-medium mt-2 text-gray-900 dark:text-white">{course.title}</h3>
+                <h3 className="font-medium mt-2 text-gray-900 dark:text-white">
+                  {course.title}
+                </h3>
                 <p className="text-sm text-gray-400">
                   {course.level} Level · Semester {course.semester}
                 </p>
@@ -213,11 +236,16 @@ function MyClasses({ profile }: any) {
             {course.classes?.length > 0 && (
               <div className="border-t border-gray-50 dark:border-white/5 pt-4 space-y-2">
                 {course.classes.map((cls: any) => (
-                  <div key={cls.id} className="flex items-center justify-between text-sm">
+                  <div
+                    key={cls.id}
+                    className="flex items-center justify-between text-sm"
+                  >
                     <span className="text-gray-600 dark:text-gray-300 font-mono text-xs">
                       {cls.day} · {cls.start_time}–{cls.end_time}
                     </span>
-                    <span className="text-gray-400">{cls.locations?.name || "Location TBD"}</span>
+                    <span className="text-gray-400">
+                      {cls.locations?.name || "Location TBD"}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -247,9 +275,12 @@ function AttendanceSessions({ profile }: any) {
     const load = async () => {
       let q = supabase
         .from("courses")
-        .select("id, code, title, classes(*, locations(name, latitude, longitude))")
+        .select(
+          "id, code, title, classes(*, locations(name, latitude, longitude))",
+        )
         .eq("lecturer_id", profile.id);
-      if (calendar) q = q.eq("session", calendar.session).eq("semester", calendar.semester);
+      if (calendar)
+        q = q.eq("session", calendar.session).eq("semester", calendar.semester);
       const { data: courses } = await q;
 
       const allClasses: any[] = [];
@@ -278,23 +309,68 @@ function AttendanceSessions({ profile }: any) {
   const handleOpen = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.classId) return;
-    setCreating(true);
 
     const selectedClass = classes.find((c) => c.id === form.classId);
-    const opens = new Date();
-    const closes = new Date(opens.getTime() + parseInt(form.duration) * 60 * 1000);
 
-    await supabase.from("attendance_sessions").insert({
-      class_id: form.classId,
-      opens_at: opens.toISOString(),
-      closes_at: closes.toISOString(),
-      radius: parseInt(form.radius),
-      latitude: selectedClass?.locations?.latitude,
-      longitude: selectedClass?.locations?.longitude,
-    });
+    // classes.locations is the joined row (via location_id), but classes
+    // also has its own latitude/longitude columns — prefer the direct
+    // columns if set, fall back to the linked location.
+    const lat = selectedClass?.latitude ?? selectedClass?.locations?.latitude;
+    const lng = selectedClass?.longitude ?? selectedClass?.locations?.longitude;
+
+    if (lat == null || lng == null) {
+      alert(
+        "This class has no location assigned. Set one before opening attendance.",
+      );
+      return;
+    }
+
+    setCreating(true);
+
+    const opens = new Date();
+    const closes = new Date(
+      opens.getTime() + parseInt(form.duration) * 60 * 1000,
+    );
+
+    // Block overlapping sessions for the same class (any session that
+    // hasn't closed yet counts as "already open")
+    const { data: overlapping, error: overlapError } = await supabase
+      .from("attendance_sessions")
+      .select("id")
+      .eq("class_id", form.classId)
+      .gte("closes_at", opens.toISOString());
+
+    if (overlapError) {
+      alert("Could not verify existing sessions. Try again.");
+      setCreating(false);
+      return;
+    }
+
+    if (overlapping && overlapping.length > 0) {
+      alert("There's already an open or upcoming session for this class.");
+      setCreating(false);
+      return;
+    }
+
+    const { error: insertError } = await supabase
+      .from("attendance_sessions")
+      .insert({
+        class_id: form.classId,
+        opens_at: opens.toISOString(),
+        closes_at: closes.toISOString(),
+        radius: parseInt(form.radius),
+        latitude: lat,
+        longitude: lng,
+      });
+
+    if (insertError) {
+      alert("Failed to open attendance session. " + insertError.message);
+      setCreating(false);
+      return;
+    }
 
     setCreating(false);
-    setForm({ classId: "", duration: "60", radius: "75" });
+    setForm({ classId: "", duration: "60", radius: "5" });
 
     const classIds = classes.map((c) => c.id);
     const { data: sess } = await supabase
@@ -311,16 +387,23 @@ function AttendanceSessions({ profile }: any) {
   return (
     <div className="grid md:grid-cols-2 gap-6">
       {/* Open session form */}
-      <form onSubmit={handleOpen} className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6 sm:p-8 space-y-5">
+      <form
+        onSubmit={handleOpen}
+        className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6 sm:p-8 space-y-5"
+      >
         <div>
-          <h2 className="text-lg font-medium text-gray-900 dark:text-white">Open attendance window</h2>
+          <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+            Open attendance window
+          </h2>
           <p className="text-sm text-gray-400">
             Students will mark attendance via GPS within the set radius
           </p>
         </div>
 
         <div>
-          <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">Class</label>
+          <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">
+            Class
+          </label>
           <select
             className="w-full border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/30"
             value={form.classId}
@@ -337,28 +420,37 @@ function AttendanceSessions({ profile }: any) {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">Duration (mins)</label>
+            <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">
+              Duration (mins)
+            </label>
             <select
               className="w-full border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/30"
               value={form.duration}
               onChange={(e) => setForm({ ...form, duration: e.target.value })}
             >
               {["15", "30", "45", "60", "90", "120"].map((d) => (
-                <option key={d} value={d}>{d} min</option>
+                <option key={d} value={d}>
+                  {d} min
+                </option>
               ))}
             </select>
           </div>
           <div>
-            <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">GPS Radius (m)</label>
+            <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">
+              GPS Radius (m)
+            </label>
             <select
               className="w-full border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/30"
               value={form.radius}
               onChange={(e) => setForm({ ...form, radius: e.target.value })}
             >
-              <option value="50">50 m (tight)</option>
-              <option value="75">75 m (default)</option>
-              <option value="100">100 m</option>
-              <option value="150">150 m (large hall)</option>
+              <option value="1">1 m</option>
+              <option value="2">2 m</option>
+              <option value="3">3 m</option>
+              <option value="4">4 m</option>
+              <option value="5">5 m (default)</option>
+              <option value="6">6 m</option>
+              <option value="7">7 m (max)</option>
             </select>
           </div>
         </div>
@@ -368,19 +460,28 @@ function AttendanceSessions({ profile }: any) {
           disabled={creating || !form.classId}
           className="flex items-center gap-2 bg-brand-green text-white rounded-full px-6 py-3 text-sm font-medium hover:bg-brand-green-dark transition disabled:opacity-50 shadow-glow"
         >
-          {creating ? <Loader2 size={14} className="animate-spin" /> : <Radio size={14} />}
+          {creating ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <Radio size={14} />
+          )}
           {creating ? "Opening..." : "Open attendance"}
         </button>
       </form>
 
       {/* Recent sessions */}
       <div className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6 sm:p-8">
-        <h2 className="text-lg font-medium text-gray-900 dark:text-white">Recent sessions</h2>
+        <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+          Recent sessions
+        </h2>
         <p className="text-sm text-gray-400 mb-6">Last 10 attendance windows</p>
         {loading ? (
           <div className="space-y-3">
             {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-16 rounded-2xl bg-gray-100 dark:bg-white/5 animate-pulse" />
+              <div
+                key={i}
+                className="h-16 rounded-2xl bg-gray-100 dark:bg-white/5 animate-pulse"
+              />
             ))}
           </div>
         ) : sessions.length === 0 ? (
@@ -388,9 +489,13 @@ function AttendanceSessions({ profile }: any) {
         ) : (
           <ul className="space-y-3">
             {sessions.map((s: any) => {
-              const isActive = new Date(s.opens_at) <= now && new Date(s.closes_at) >= now;
+              const isActive =
+                new Date(s.opens_at) <= now && new Date(s.closes_at) >= now;
               return (
-                <li key={s.id} className="border border-gray-100 dark:border-white/10 rounded-2xl p-4">
+                <li
+                  key={s.id}
+                  className="border border-gray-100 dark:border-white/10 rounded-2xl p-4"
+                >
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-mono font-medium text-gray-900 dark:text-white">
                       {s.classes?.courses?.code}
@@ -434,8 +539,8 @@ function AttendanceSessions({ profile }: any) {
 function AssignmentsManager({ profile }: any) {
   const [assignments, setAssignments] = useState<any[]>([]);
   const [courses, setCourses] = useState<any[]>([]);
-   const { calendar, loading: calendarLoading } = useAcademicCalendar();
- 
+  const { calendar, loading: calendarLoading } = useAcademicCalendar();
+
   const [form, setForm] = useState({
     courseId: "",
     title: "",
@@ -448,15 +553,22 @@ function AssignmentsManager({ profile }: any) {
   useEffect(() => {
     if (!profile?.id || calendarLoading) return;
     const load = async () => {
-      let q = supabase.from("courses").select("id, code, title").eq("lecturer_id", profile.id);
-      if (calendar) q = q.eq("session", calendar.session).eq("semester", calendar.semester);
+      let q = supabase
+        .from("courses")
+        .select("id, code, title")
+        .eq("lecturer_id", profile.id);
+      if (calendar)
+        q = q.eq("session", calendar.session).eq("semester", calendar.semester);
       const { data: c } = await q;
       setCourses(c || []);
       if (c && c.length > 0) {
         const { data: a } = await supabase
           .from("assignments")
           .select("*, courses(code)")
-          .in("course_id", c.map((x: any) => x.id))
+          .in(
+            "course_id",
+            c.map((x: any) => x.id),
+          )
           .order("created_at", { ascending: false });
         setAssignments(a || []);
       }
@@ -487,14 +599,23 @@ function AssignmentsManager({ profile }: any) {
 
   return (
     <div className="grid md:grid-cols-2 gap-6">
-      <form onSubmit={handleCreate} className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6 sm:p-8 space-y-5">
+      <form
+        onSubmit={handleCreate}
+        className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6 sm:p-8 space-y-5"
+      >
         <div>
-          <h2 className="text-lg font-medium text-gray-900 dark:text-white">Create assignment</h2>
-          <p className="text-sm text-gray-400">Publish a new task for students</p>
+          <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+            Create assignment
+          </h2>
+          <p className="text-sm text-gray-400">
+            Publish a new task for students
+          </p>
         </div>
 
         <div>
-          <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">Course</label>
+          <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">
+            Course
+          </label>
           <select
             className="w-full border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/30"
             value={form.courseId}
@@ -502,13 +623,17 @@ function AssignmentsManager({ profile }: any) {
           >
             <option value="">Select course</option>
             {courses.map((c) => (
-              <option key={c.id} value={c.id}>{c.code} - {c.title}</option>
+              <option key={c.id} value={c.id}>
+                {c.code} - {c.title}
+              </option>
             ))}
           </select>
         </div>
 
         <div>
-          <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">Title</label>
+          <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">
+            Title
+          </label>
           <input
             className="w-full border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/30"
             placeholder="Assignment title"
@@ -518,7 +643,9 @@ function AssignmentsManager({ profile }: any) {
         </div>
 
         <div>
-          <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">Description (optional)</label>
+          <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">
+            Description (optional)
+          </label>
           <textarea
             className="w-full border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-xl px-4 py-3 text-sm h-24 focus:outline-none focus:ring-2 focus:ring-brand-green/30 resize-none"
             placeholder="Assignment details..."
@@ -528,7 +655,9 @@ function AssignmentsManager({ profile }: any) {
         </div>
 
         <div>
-          <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">Deadline (optional)</label>
+          <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">
+            Deadline (optional)
+          </label>
           <input
             type="datetime-local"
             className="w-full border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/30"
@@ -542,18 +671,27 @@ function AssignmentsManager({ profile }: any) {
           disabled={saving || !form.courseId || !form.title.trim()}
           className="flex items-center gap-2 bg-[#0a0a0a] dark:bg-white text-white dark:text-[#0a0a0a] rounded-full px-6 py-3 text-sm font-medium hover:bg-gray-800 dark:hover:bg-gray-100 transition disabled:opacity-50 shadow-soft dark:shadow-soft-dark"
         >
-          {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+          {saving ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <Plus size={14} />
+          )}
           {saving ? "Publishing..." : "Publish assignment"}
         </button>
       </form>
 
       <div className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6 sm:p-8">
-        <h2 className="text-lg font-medium text-gray-900 dark:text-white">Published assignments</h2>
+        <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+          Published assignments
+        </h2>
         <p className="text-sm text-gray-400 mb-6">All tasks you've created</p>
         {loading ? (
           <div className="space-y-3">
             {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-16 rounded-2xl bg-gray-100 dark:bg-white/5 animate-pulse" />
+              <div
+                key={i}
+                className="h-16 rounded-2xl bg-gray-100 dark:bg-white/5 animate-pulse"
+              />
             ))}
           </div>
         ) : assignments.length === 0 ? (
@@ -563,11 +701,18 @@ function AssignmentsManager({ profile }: any) {
             {assignments.map((a: any) => {
               const overdue = a.deadline && new Date(a.deadline) < new Date();
               return (
-                <li key={a.id} className="border border-gray-100 dark:border-white/10 rounded-2xl p-4">
+                <li
+                  key={a.id}
+                  className="border border-gray-100 dark:border-white/10 rounded-2xl p-4"
+                >
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="text-xs font-mono text-brand-green font-medium">{a.courses?.code}</p>
-                      <p className="text-sm font-medium mt-0.5 text-gray-900 dark:text-white">{a.title}</p>
+                      <p className="text-xs font-mono text-brand-green font-medium">
+                        {a.courses?.code}
+                      </p>
+                      <p className="text-sm font-medium mt-0.5 text-gray-900 dark:text-white">
+                        {a.title}
+                      </p>
                     </div>
                     <span
                       className={`text-xs font-mono px-2 py-0.5 rounded-full font-medium shrink-0 ${
@@ -577,7 +722,12 @@ function AssignmentsManager({ profile }: any) {
                       }`}
                     >
                       {a.deadline
-                        ? `${overdue ? "Closed" : "Due"} ${new Date(a.deadline).toLocaleDateString([], { month: "short", day: "numeric" })}`
+                        ? `${overdue ? "Closed" : "Due"} ${new Date(
+                            a.deadline,
+                          ).toLocaleDateString([], {
+                            month: "short",
+                            day: "numeric",
+                          })}`
                         : "No deadline"}
                     </span>
                   </div>
@@ -616,8 +766,13 @@ function ComplaintsManager({ profile }: any) {
     const reply = replies[id]?.trim();
     if (!reply) return;
     setSaving(id);
-    await supabase.from("complaints").update({ reply, status: "resolved" }).eq("id", id);
-    setComplaints((prev) => prev.map((c) => (c.id === id ? { ...c, reply, status: "resolved" } : c)));
+    await supabase
+      .from("complaints")
+      .update({ reply, status: "resolved" })
+      .eq("id", id);
+    setComplaints((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, reply, status: "resolved" } : c)),
+    );
     setSaving(null);
   };
 
@@ -634,7 +789,10 @@ function ComplaintsManager({ profile }: any) {
   if (complaints.length === 0) {
     return (
       <div className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-16 flex flex-col items-center text-center">
-        <CheckCircle2 size={32} className="text-gray-200 dark:text-gray-700 mb-4" />
+        <CheckCircle2
+          size={32}
+          className="text-gray-200 dark:text-gray-700 mb-4"
+        />
         <p className="text-gray-400">No complaints received</p>
       </div>
     );
@@ -643,10 +801,15 @@ function ComplaintsManager({ profile }: any) {
   return (
     <div className="space-y-4">
       {complaints.map((c: any) => (
-        <div key={c.id} className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6">
+        <div
+          key={c.id}
+          className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6"
+        >
           <div className="flex items-start justify-between mb-3">
             <div>
-              <p className="text-sm font-medium text-gray-900 dark:text-white">{c.subject}</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                {c.subject}
+              </p>
               <p className="text-xs text-gray-400 mt-0.5">
                 From {c.student?.full_name || "—"}
                 {c.courses?.code ? ` · ${c.courses.code}` : ""}
@@ -666,7 +829,9 @@ function ComplaintsManager({ profile }: any) {
             {c.message}
           </p>
           {c.reply ? (
-            <p className="text-xs text-gray-500 dark:text-gray-400 italic">Your reply: {c.reply}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+              Your reply: {c.reply}
+            </p>
           ) : (
             <div className="flex gap-2">
               <input
@@ -674,14 +839,18 @@ function ComplaintsManager({ profile }: any) {
                 placeholder="Type a reply..."
                 className="flex-1 border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/30"
                 value={replies[c.id] || ""}
-                onChange={(e) => setReplies({ ...replies, [c.id]: e.target.value })}
+                onChange={(e) =>
+                  setReplies({ ...replies, [c.id]: e.target.value })
+                }
               />
               <button
                 onClick={() => handleReply(c.id)}
                 disabled={saving === c.id}
                 className="flex items-center gap-1 bg-[#0a0a0a] dark:bg-white text-white dark:text-[#0a0a0a] rounded-xl px-4 py-2 text-xs font-medium hover:bg-gray-800 dark:hover:bg-gray-100 transition disabled:opacity-50"
               >
-                {saving === c.id ? <Loader2 size={12} className="animate-spin" /> : null}
+                {saving === c.id ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : null}
                 Reply
               </button>
             </div>
@@ -735,20 +904,35 @@ function AnnouncementsManager({ profile }: any) {
       .select()
       .single();
     if (data) setAnnouncements([data, ...announcements]);
-    setForm({ title: "", body: "", type: "announcement", target_role: "all", target_level: "" });
+    setForm({
+      title: "",
+      body: "",
+      type: "announcement",
+      target_role: "all",
+      target_level: "",
+    });
     setSaving(false);
   };
 
   return (
     <div className="grid md:grid-cols-2 gap-6">
-      <form onSubmit={handlePost} className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6 sm:p-8 space-y-5">
+      <form
+        onSubmit={handlePost}
+        className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6 sm:p-8 space-y-5"
+      >
         <div>
-          <h2 className="text-lg font-medium text-gray-900 dark:text-white">Post announcement</h2>
-          <p className="text-sm text-gray-400">Broadcast a message to students</p>
+          <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+            Post announcement
+          </h2>
+          <p className="text-sm text-gray-400">
+            Broadcast a message to students
+          </p>
         </div>
 
         <div>
-          <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">Title</label>
+          <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">
+            Title
+          </label>
           <input
             className="w-full border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/30"
             placeholder="Announcement title"
@@ -758,7 +942,9 @@ function AnnouncementsManager({ profile }: any) {
         </div>
 
         <div>
-          <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">Body</label>
+          <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">
+            Body
+          </label>
           <textarea
             className="w-full border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-xl px-4 py-3 text-sm h-32 focus:outline-none focus:ring-2 focus:ring-brand-green/30 resize-none"
             placeholder="Message content..."
@@ -769,7 +955,9 @@ function AnnouncementsManager({ profile }: any) {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">Type</label>
+            <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">
+              Type
+            </label>
             <select
               className="w-full border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/30"
               value={form.type}
@@ -781,11 +969,15 @@ function AnnouncementsManager({ profile }: any) {
             </select>
           </div>
           <div>
-            <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">Target Level</label>
+            <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">
+              Target Level
+            </label>
             <select
               className="w-full border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/30"
               value={form.target_level}
-              onChange={(e) => setForm({ ...form, target_level: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, target_level: e.target.value })
+              }
             >
               <option value="">All levels</option>
               <option value="100">100 Level</option>
@@ -802,18 +994,27 @@ function AnnouncementsManager({ profile }: any) {
           disabled={saving || !form.title.trim() || !form.body.trim()}
           className="flex items-center gap-2 bg-[#0a0a0a] dark:bg-white text-white dark:text-[#0a0a0a] rounded-full px-6 py-3 text-sm font-medium hover:bg-gray-800 dark:hover:bg-gray-100 transition disabled:opacity-50 shadow-soft dark:shadow-soft-dark"
         >
-          {saving ? <Loader2 size={14} className="animate-spin" /> : <Megaphone size={14} />}
+          {saving ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <Megaphone size={14} />
+          )}
           {saving ? "Posting..." : "Post announcement"}
         </button>
       </form>
 
       <div className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6 sm:p-8">
-        <h2 className="text-lg font-medium text-gray-900 dark:text-white">Recent announcements</h2>
+        <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+          Recent announcements
+        </h2>
         <p className="text-sm text-gray-400 mb-6">Last 20 posts</p>
         {loading ? (
           <div className="space-y-3">
             {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-16 rounded-2xl bg-gray-100 dark:bg-white/5 animate-pulse" />
+              <div
+                key={i}
+                className="h-16 rounded-2xl bg-gray-100 dark:bg-white/5 animate-pulse"
+              />
             ))}
           </div>
         ) : announcements.length === 0 ? (
@@ -821,14 +1022,24 @@ function AnnouncementsManager({ profile }: any) {
         ) : (
           <ul className="space-y-3">
             {announcements.map((a: any) => (
-              <li key={a.id} className="border border-gray-100 dark:border-white/10 rounded-2xl p-4">
+              <li
+                key={a.id}
+                className="border border-gray-100 dark:border-white/10 rounded-2xl p-4"
+              >
                 <div className="flex items-start justify-between">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">{a.title}</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {a.title}
+                  </p>
                   <span className="text-xs font-mono text-gray-400 shrink-0 ml-3">
-                    {new Date(a.created_at).toLocaleDateString([], { month: "short", day: "numeric" })}
+                    {new Date(a.created_at).toLocaleDateString([], {
+                      month: "short",
+                      day: "numeric",
+                    })}
                   </span>
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">{a.body}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
+                  {a.body}
+                </p>
               </li>
             ))}
           </ul>

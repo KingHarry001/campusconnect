@@ -5,11 +5,16 @@ import { useState } from "react";
 import { LucideIcon, ChevronDown } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import ProfileDrawer from "@/components/dashboard/ProfileDrawer";
+import Image from "next/image";
 
-interface Tab { key: string; label: string; icon: LucideIcon; }
+interface Tab {
+  key: string;
+  label: string;
+  icon: LucideIcon;
+}
 interface DashboardLayoutProps {
-  tabs: Tab[];              // primary — max 4, shown in mobile bottom bar + desktop sidebar
-  secondaryTabs?: Tab[];    // overflow — desktop: "More" section in sidebar. Mobile: drawer only.
+  tabs: Tab[]; // primary — max 4, shown in mobile bottom bar + desktop sidebar
+  secondaryTabs?: Tab[]; // overflow — desktop: "More" section in sidebar. Mobile: drawer only.
   active: string;
   setActive: (key: string) => void;
   title: string;
@@ -18,7 +23,13 @@ interface DashboardLayoutProps {
 }
 
 export default function DashboardLayout({
-  tabs, secondaryTabs = [], active, setActive, title, portalLabel, children,
+  tabs,
+  secondaryTabs = [],
+  active,
+  setActive,
+  title,
+  portalLabel,
+  children,
 }: DashboardLayoutProps) {
   const { profile } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -33,10 +44,18 @@ export default function DashboardLayout({
         <div className="glass-panel rounded-3xl shadow-lifted dark:shadow-lifted-dark px-5 py-7 flex flex-col h-full">
           <div className="flex-1 overflow-y-auto">
             <div className="flex items-center gap-3 mb-10 px-1">
-              <img src="/oou-crest.jpg" alt="" className="h-10 w-10 object-contain rounded-full ring-2 ring-brand-green/20" />
+              <Image
+                src="/oou-crest.jpg"
+                alt=""
+                className="h-10 w-10 object-contain rounded-full ring-2 ring-brand-green/20"
+              />
               <div className="leading-tight">
-                <p className="font-medium text-sm text-gray-900 dark:text-white">Campus Connect</p>
-                <p className="text-[11px] font-mono uppercase tracking-wider text-brand-green">{portalLabel}</p>
+                <p className="font-medium text-sm text-gray-900 dark:text-white">
+                  Campus Connect
+                </p>
+                <p className="text-[11px] font-mono uppercase tracking-wider text-brand-green">
+                  {portalLabel}
+                </p>
               </div>
             </div>
 
@@ -69,7 +88,12 @@ export default function DashboardLayout({
                   className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-mono uppercase tracking-wider text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition"
                 >
                   More
-                  <ChevronDown size={14} className={`transition-transform ${moreOpen || isSecondaryActive ? "rotate-180" : ""}`} />
+                  <ChevronDown
+                    size={14}
+                    className={`transition-transform ${
+                      moreOpen || isSecondaryActive ? "rotate-180" : ""
+                    }`}
+                  />
                 </button>
                 {(moreOpen || isSecondaryActive) && (
                   <nav className="flex flex-col gap-1.5 mt-1">
@@ -103,11 +127,23 @@ export default function DashboardLayout({
             className="flex items-center gap-3 px-3 py-3 hover:bg-gray-50 dark:hover:bg-white/5 rounded-2xl transition text-left shadow-soft dark:shadow-soft-dark bg-white/50 dark:bg-white/[0.03]"
           >
             <div className="h-9 w-9 rounded-full bg-gray-100 dark:bg-white/10 ring-2 ring-brand-green/20 flex items-center justify-center text-sm font-medium overflow-hidden text-gray-900 dark:text-white">
-              {profile?.avatar_url ? <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" /> : profile?.full_name?.[0] || "?"}
+              {profile?.avatar_url ? (
+                <Image
+                  src={profile.avatar_url}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                profile?.full_name?.[0] || "?"
+              )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate text-gray-900 dark:text-white">{profile?.full_name}</p>
-              <p className="text-[11px] font-mono text-gray-400 truncate">{profile?.email}</p>
+              <p className="text-sm font-medium truncate text-gray-900 dark:text-white">
+                {profile?.full_name}
+              </p>
+              <p className="text-[11px] font-mono text-gray-400 truncate">
+                {profile?.email}
+              </p>
             </div>
           </button>
         </div>
@@ -117,10 +153,18 @@ export default function DashboardLayout({
         {/* Mobile top bar */}
         <header className="lg:hidden flex items-center justify-between px-5 py-4 sticky top-0 z-20 glass-panel border-x-0 border-t-0 rounded-none shadow-soft dark:shadow-soft-dark">
           <div className="flex items-center gap-2.5">
-            <img src="/oou-crest.jpg" alt="" className="h-8 w-8 object-contain rounded-full ring-2 ring-brand-green/20" />
+            <Image
+              src="/oou-crest.jpg"
+              alt=""
+              className="h-8 w-8 object-contain rounded-full ring-2 ring-brand-green/20"
+            />
             <div className="leading-tight">
-              <p className="font-medium text-sm text-gray-900 dark:text-white">{title}</p>
-              <p className="text-[10px] font-mono uppercase tracking-wider text-brand-green">{portalLabel}</p>
+              <p className="font-medium text-sm text-gray-900 dark:text-white">
+                {title}
+              </p>
+              <p className="text-[10px] font-mono uppercase tracking-wider text-brand-green">
+                {portalLabel}
+              </p>
             </div>
           </div>
           <button
@@ -128,14 +172,26 @@ export default function DashboardLayout({
             className="h-8 w-8 rounded-full bg-gray-100 dark:bg-white/10 ring-2 ring-brand-green/20 flex items-center justify-center text-xs font-medium overflow-hidden text-gray-900 dark:text-white"
             aria-label="Open profile menu"
           >
-            {profile?.avatar_url ? <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" /> : profile?.full_name?.[0] || "?"}
+            {profile?.avatar_url ? (
+              <Image
+                src={profile.avatar_url}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              profile?.full_name?.[0] || "?"
+            )}
           </button>
         </header>
 
         <header className="hidden lg:flex items-center justify-between px-12 pt-10">
           <div>
-            <h1 className="text-2xl font-medium text-gray-900 dark:text-white">{title}</h1>
-            <p className="text-xs font-mono text-gray-400 mt-1">{portalLabel.toLowerCase()}</p>
+            <h1 className="text-2xl font-medium text-gray-900 dark:text-white">
+              {title}
+            </h1>
+            <p className="text-xs font-mono text-gray-400 mt-1">
+              {portalLabel.toLowerCase()}
+            </p>
           </div>
         </header>
 
@@ -149,11 +205,31 @@ export default function DashboardLayout({
             {tabs.map(({ key, label, icon: Icon }) => {
               const isActive = active === key;
               return (
-                <button key={key} onClick={() => setActive(key)} className="flex-1 flex flex-col items-center gap-1 py-1.5 px-1">
-                  <div className={`p-1.5 rounded-xl transition ${isActive ? "bg-brand-green/15 shadow-glow" : ""}`}>
-                    <Icon size={18} strokeWidth={isActive ? 2 : 1.5} className={isActive ? "text-brand-green" : "text-gray-400"} />
+                <button
+                  key={key}
+                  onClick={() => setActive(key)}
+                  className="flex-1 flex flex-col items-center gap-1 py-1.5 px-1"
+                >
+                  <div
+                    className={`p-1.5 rounded-xl transition ${
+                      isActive ? "bg-brand-green/15 shadow-glow" : ""
+                    }`}
+                  >
+                    <Icon
+                      size={18}
+                      strokeWidth={isActive ? 2 : 1.5}
+                      className={
+                        isActive ? "text-brand-green" : "text-gray-400"
+                      }
+                    />
                   </div>
-                  <span className={`text-[10px] leading-none text-center ${isActive ? "text-brand-green font-medium" : "text-gray-400"}`}>
+                  <span
+                    className={`text-[10px] leading-none text-center ${
+                      isActive
+                        ? "text-brand-green font-medium"
+                        : "text-gray-400"
+                    }`}
+                  >
                     {label.split(" ")[0]}
                   </span>
                 </button>

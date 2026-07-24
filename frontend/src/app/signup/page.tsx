@@ -8,6 +8,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, Loader2, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import GridBackground from "@/components/ui/GridBackground";
+import Image from "next/image";
 
 interface FormState {
   fullName: string;
@@ -502,7 +503,7 @@ function SignUpForm() {
         <div className="relative bg-[#0a0a0a] px-6 pt-14 pb-10 rounded-b-[32px] overflow-hidden shadow-lifted-dark">
           <GridBackground size={32} />
           <div className="relative flex items-center gap-2 mb-8">
-            <img src="/oou-crest.jpg" alt="" className="h-8 w-8 object-contain rounded-full ring-2 ring-brand-green/20" />
+            <Image src="/oou-crest.jpg" alt="" className="h-8 w-8 object-contain rounded-full ring-2 ring-brand-green/20" />
             <span className="text-white font-medium text-sm">Campus Connect</span>
           </div>
           <h1 className="relative text-white text-2xl font-medium leading-tight">
@@ -536,14 +537,14 @@ function SignUpForm() {
       <div className="min-h-screen hidden md:grid md:grid-cols-2 dark:bg-[#0a0a0a] transition-colors">
         <div className="relative bg-[#0a0a0a] text-white px-10 lg:px-16 py-16 flex flex-col justify-between overflow-hidden">
           <GridBackground />
-          <img
+          <Image
             src="/oou-crest.jpg"
             alt=""
             aria-hidden="true"
             className="absolute -right-16 -bottom-16 w-80 h-80 object-contain opacity-[0.06] pointer-events-none"
           />
           <div className="relative flex items-center gap-3">
-            <img
+            <Image
               src="/oou-crest.jpg"
               alt="Olabisi Onabanjo University crest"
               className="h-10 w-10 object-contain rounded-full ring-2 ring-brand-green/20"

@@ -5,10 +5,19 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
-  ArrowLeft, Camera, Loader2, Pencil, Check, X, ShieldCheck, Mail, LogOut,
+  ArrowLeft,
+  Camera,
+  Loader2,
+  Pencil,
+  Check,
+  X,
+  ShieldCheck,
+  Mail,
+  LogOut,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
+import Image from "next/image";
 
 // Matches database/schema.sql — a single `public.users` table (not `profiles`)
 // holds every field, keyed by the auth.users id.
@@ -24,7 +33,10 @@ export default function ProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url ?? "");
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [banner, setBanner] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [banner, setBanner] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const initials = profile?.full_name?.[0] || "?";
@@ -48,7 +60,10 @@ export default function ProfilePage() {
   const isLecturer = profile?.role === "lecturer";
 
   const memberSince = extra?.created_at
-    ? new Date(extra.created_at).toLocaleDateString(undefined, { month: "long", year: "numeric" })
+    ? new Date(extra.created_at).toLocaleDateString(undefined, {
+        month: "long",
+        year: "numeric",
+      })
     : null;
 
   const handleAvatarPick = () => fileInputRef.current?.click();
@@ -68,7 +83,9 @@ export default function ProfilePage() {
         .upload(path, file, { upsert: true });
       if (uploadError) throw uploadError;
 
-      const { data: publicUrlData } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path);
+      const { data: publicUrlData } = supabase.storage
+        .from(AVATAR_BUCKET)
+        .getPublicUrl(path);
       const newUrl = publicUrlData.publicUrl;
 
       const { error: updateError } = await supabase
@@ -83,7 +100,10 @@ export default function ProfilePage() {
       // call it here so the rest of the app picks up the new avatar too.
     } catch (err) {
       console.error("Avatar upload failed:", err);
-      setBanner({ type: "error", message: "Couldn't upload that photo. Try a smaller image." });
+      setBanner({
+        type: "error",
+        message: "Couldn't upload that photo. Try a smaller image.",
+      });
     } finally {
       setUploadingAvatar(false);
     }
@@ -107,7 +127,10 @@ export default function ProfilePage() {
       setEditing(false);
     } catch (err) {
       console.error("Profile update failed:", err);
-      setBanner({ type: "error", message: "Couldn't save changes. Please try again." });
+      setBanner({
+        type: "error",
+        message: "Couldn't save changes. Please try again.",
+      });
     } finally {
       setSaving(false);
     }
@@ -130,7 +153,9 @@ export default function ProfilePage() {
         >
           <ArrowLeft size={18} />
         </button>
-        <h1 className="text-lg font-medium text-gray-900 dark:text-white">Profile</h1>
+        <h1 className="text-lg font-medium text-gray-900 dark:text-white">
+          Profile
+        </h1>
       </header>
 
       <main className="max-w-3xl mx-auto px-5 sm:px-8 pb-20">
@@ -152,7 +177,11 @@ export default function ProfilePage() {
           <div className="relative inline-block">
             <div className="h-24 w-24 rounded-full bg-white/10 flex items-center justify-center text-3xl font-medium overflow-hidden text-white ring-4 ring-white/10">
               {avatarUrl ? (
-                <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+                <Image
+                  src={avatarUrl}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
               ) : (
                 initials
               )}
@@ -163,7 +192,11 @@ export default function ProfilePage() {
               className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full bg-green-400 text-[#0a0a0a] flex items-center justify-center shadow-lg hover:bg-green-300 transition disabled:opacity-60"
               aria-label="Change profile photo"
             >
-              {uploadingAvatar ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
+              {uploadingAvatar ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Camera size={14} />
+              )}
             </button>
             <input
               ref={fileInputRef}
@@ -174,8 +207,12 @@ export default function ProfilePage() {
             />
           </div>
 
-          <p className="relative mt-5 text-xl font-medium text-white">{profile?.full_name}</p>
-          <p className="relative text-sm text-white/50 mt-1">{profile?.email}</p>
+          <p className="relative mt-5 text-xl font-medium text-white">
+            {profile?.full_name}
+          </p>
+          <p className="relative text-sm text-white/50 mt-1">
+            {profile?.email}
+          </p>
 
           {profile?.role && (
             <span className="relative inline-flex items-center gap-1.5 mt-4 text-[11px] uppercase tracking-wide font-medium text-green-400 bg-green-400/10 rounded-full px-3 py-1.5">
@@ -203,7 +240,9 @@ export default function ProfilePage() {
         {/* Account details */}
         <section className="mt-8">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-xs uppercase tracking-wide text-gray-400 font-medium">Account details</p>
+            <p className="text-xs uppercase tracking-wide text-gray-400 font-medium">
+              Account details
+            </p>
             {!editing ? (
               <button
                 onClick={() => setEditing(true)}
@@ -227,7 +266,11 @@ export default function ProfilePage() {
                   disabled={saving || !fullName.trim()}
                   className="flex items-center gap-1.5 text-sm font-medium text-white bg-[#0a0a0a] dark:bg-white dark:text-[#0a0a0a] rounded-full px-4 py-1.5 disabled:opacity-50"
                 >
-                  {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                  {saving ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <Check size={13} />
+                  )}
                   Save
                 </button>
               </div>
@@ -245,7 +288,9 @@ export default function ProfilePage() {
                   autoFocus
                 />
               ) : (
-                <p className="text-sm font-medium text-gray-900 dark:text-white">{profile?.full_name}</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  {profile?.full_name}
+                </p>
               )}
             </div>
 
@@ -253,55 +298,71 @@ export default function ProfilePage() {
               <p className="text-xs text-gray-400 mb-1.5 flex items-center gap-1.5">
                 <Mail size={12} /> Email
               </p>
-              <p className="text-sm font-medium text-gray-900 dark:text-white">{profile?.email}</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                {profile?.email}
+              </p>
             </div>
 
             {extra?.department && (
               <div className="px-5 py-4">
                 <p className="text-xs text-gray-400 mb-1.5">Department</p>
-                <p className="text-sm font-medium text-gray-900 dark:text-white">{extra.department}</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  {extra.department}
+                </p>
               </div>
             )}
 
             {!isLecturer && extra?.matric_number && (
               <div className="px-5 py-4">
                 <p className="text-xs text-gray-400 mb-1.5">Matric number</p>
-                <p className="text-sm font-medium text-gray-900 dark:text-white">{extra.matric_number}</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  {extra.matric_number}
+                </p>
               </div>
             )}
 
             {!isLecturer && extra?.level && (
               <div className="px-5 py-4">
                 <p className="text-xs text-gray-400 mb-1.5">Level</p>
-                <p className="text-sm font-medium text-gray-900 dark:text-white">{extra.level} Level</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  {extra.level} Level
+                </p>
               </div>
             )}
 
             {!isLecturer && extra?.academic_adviser && (
               <div className="px-5 py-4">
                 <p className="text-xs text-gray-400 mb-1.5">Academic adviser</p>
-                <p className="text-sm font-medium text-gray-900 dark:text-white">{extra.academic_adviser}</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  {extra.academic_adviser}
+                </p>
               </div>
             )}
 
             {isLecturer && extra?.staff_id && (
               <div className="px-5 py-4">
                 <p className="text-xs text-gray-400 mb-1.5">Staff ID</p>
-                <p className="text-sm font-medium text-gray-900 dark:text-white">{extra.staff_id}</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  {extra.staff_id}
+                </p>
               </div>
             )}
 
             {isLecturer && extra?.office && (
               <div className="px-5 py-4">
                 <p className="text-xs text-gray-400 mb-1.5">Office</p>
-                <p className="text-sm font-medium text-gray-900 dark:text-white">{extra.office}</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  {extra.office}
+                </p>
               </div>
             )}
 
             {extra?.phone && (
               <div className="px-5 py-4">
                 <p className="text-xs text-gray-400 mb-1.5">Phone</p>
-                <p className="text-sm font-medium text-gray-900 dark:text-white">{extra.phone}</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  {extra.phone}
+                </p>
               </div>
             )}
 
@@ -317,7 +378,9 @@ export default function ProfilePage() {
             {memberSince && (
               <div className="px-5 py-4">
                 <p className="text-xs text-gray-400 mb-1.5">Member since</p>
-                <p className="text-sm font-medium text-gray-900 dark:text-white">{memberSince}</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  {memberSince}
+                </p>
               </div>
             )}
           </div>

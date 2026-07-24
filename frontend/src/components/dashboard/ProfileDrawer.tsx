@@ -4,15 +4,32 @@
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import {
-  X, User, Sun, Moon, Monitor, Bot, Info, LogOut, ChevronRight,
-  ChevronDown, Check, MessageCircle, LucideIcon,
+  X,
+  User,
+  Sun,
+  Moon,
+  Monitor,
+  Bot,
+  Info,
+  LogOut,
+  ChevronRight,
+  ChevronDown,
+  Check,
+  MessageCircle,
+  LucideIcon,
+  Newspaper,
 } from "lucide-react";
 import ComplaintModal from "@/components/dashboard/ComplaintModal";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import Image from "next/image";
 
-interface Tab { key: string; label: string; icon: LucideIcon; }
+interface Tab {
+  key: string;
+  label: string;
+  icon: LucideIcon;
+}
 
 interface ProfileDrawerProps {
   open: boolean;
@@ -29,7 +46,11 @@ const THEME_OPTIONS = [
 ] as const;
 
 export default function ProfileDrawer({
-  open, onClose, secondaryTabs = [], active, onSelectTab,
+  open,
+  onClose,
+  secondaryTabs = [],
+  active,
+  onSelectTab,
 }: ProfileDrawerProps) {
   const { profile, signOut } = useAuth();
   const { theme, setTheme } = useTheme();
@@ -39,7 +60,9 @@ export default function ProfileDrawer({
   const [complaintOpen, setComplaintOpen] = useState(false);
 
   useEffect(() => setMounted(true), []);
-  useEffect(() => { if (!open) setThemeMenuOpen(false); }, [open]);
+  useEffect(() => {
+    if (!open) setThemeMenuOpen(false);
+  }, [open]);
 
   const menuItems = [
     { icon: User, label: "Profile", href: "/profile" },
@@ -47,7 +70,8 @@ export default function ProfileDrawer({
     { icon: Info, label: "About Campus Connect", href: "/about" },
   ];
 
-  const activeThemeOption = THEME_OPTIONS.find((t) => t.key === theme) ?? THEME_OPTIONS[2];
+  const activeThemeOption =
+    THEME_OPTIONS.find((t) => t.key === theme) ?? THEME_OPTIONS[2];
 
   const handleSignOut = async () => {
     if (signingOut) return;
@@ -96,13 +120,21 @@ export default function ProfileDrawer({
 
                 <div className="h-16 w-16 rounded-full bg-gray-100 dark:bg-white/10 ring-4 ring-brand-green/15 shadow-glow flex items-center justify-center text-xl font-medium overflow-hidden mb-4 text-gray-900 dark:text-white">
                   {profile?.avatar_url ? (
-                    <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
+                    <Image
+                      src={profile.avatar_url}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
                   ) : (
                     profile?.full_name?.[0] || "?"
                   )}
                 </div>
-                <p className="font-medium text-gray-900 dark:text-white">{profile?.full_name}</p>
-                <p className="text-xs font-mono text-gray-400 mt-0.5">{profile?.email}</p>
+                <p className="font-medium text-gray-900 dark:text-white">
+                  {profile?.full_name}
+                </p>
+                <p className="text-xs font-mono text-gray-400 mt-0.5">
+                  {profile?.email}
+                </p>
                 {profile?.role && (
                   <span className="inline-block mt-2 text-[10px] font-mono uppercase tracking-wider font-medium text-brand-green bg-brand-green/10 border border-brand-green/20 rounded-full px-2.5 py-1">
                     {profile.role}
@@ -134,10 +166,20 @@ export default function ProfileDrawer({
                             }`}
                           >
                             <span className="flex items-center gap-3">
-                              <Icon size={18} strokeWidth={1.75} className={isActive ? "text-brand-green" : "text-gray-400"} />
+                              <Icon
+                                size={18}
+                                strokeWidth={1.75}
+                                className={
+                                  isActive
+                                    ? "text-brand-green"
+                                    : "text-gray-400"
+                                }
+                              />
                               {label}
                             </span>
-                            {isActive && <Check size={15} className="text-brand-green" />}
+                            {isActive && (
+                              <Check size={15} className="text-brand-green" />
+                            )}
                           </button>
                         );
                       })}
@@ -155,13 +197,43 @@ export default function ProfileDrawer({
                       className="flex items-center justify-between px-6 py-3.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-brand-green/5 transition"
                     >
                       <span className="flex items-center gap-3">
-                        <Icon size={18} strokeWidth={1.75} className="text-gray-400" />
+                        <Icon
+                          size={18}
+                          strokeWidth={1.75}
+                          className="text-gray-400"
+                        />
                         {label}
                       </span>
                       <ChevronRight size={16} className="text-gray-300" />
                     </Link>
                   </div>
                 ))}
+
+                <div className="mx-6 trace-divider opacity-40" />
+                <button
+                  onClick={() => selectTab("news")}
+                  className={`w-full flex items-center justify-between px-6 py-3.5 text-sm transition ${
+                    active === "news"
+                      ? "text-brand-green font-medium bg-brand-green/5"
+                      : "text-gray-700 dark:text-gray-200 hover:bg-brand-green/5"
+                  }`}
+                >
+                  <span className="flex items-center gap-3">
+                    <Newspaper
+                      size={18}
+                      strokeWidth={1.75}
+                      className={
+                        active === "news" ? "text-brand-green" : "text-gray-400"
+                      }
+                    />
+                    News
+                  </span>
+                  {active === "news" ? (
+                    <Check size={15} className="text-brand-green" />
+                  ) : (
+                    <ChevronRight size={16} className="text-gray-300" />
+                  )}
+                </button>
 
                 <div className="mx-6 trace-divider opacity-40" />
 
@@ -173,12 +245,25 @@ export default function ProfileDrawer({
                     className="w-full flex items-center justify-between px-6 py-3.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-brand-green/5 transition"
                   >
                     <span className="flex items-center gap-3">
-                      <Sun size={18} strokeWidth={1.75} className="text-gray-400" />
+                      <Sun
+                        size={18}
+                        strokeWidth={1.75}
+                        className="text-gray-400"
+                      />
                       Appearance
                     </span>
                     <span className="flex items-center gap-2 text-gray-400">
-                      {mounted && <span className="text-xs font-mono">{activeThemeOption.label}</span>}
-                      <ChevronDown size={16} className={`transition-transform ${themeMenuOpen ? "rotate-180" : ""}`} />
+                      {mounted && (
+                        <span className="text-xs font-mono">
+                          {activeThemeOption.label}
+                        </span>
+                      )}
+                      <ChevronDown
+                        size={16}
+                        className={`transition-transform ${
+                          themeMenuOpen ? "rotate-180" : ""
+                        }`}
+                      />
                     </span>
                   </button>
 
@@ -198,7 +283,10 @@ export default function ProfileDrawer({
                               return (
                                 <button
                                   key={key}
-                                  onClick={() => { setTheme(key); setThemeMenuOpen(false); }}
+                                  onClick={() => {
+                                    setTheme(key);
+                                    setThemeMenuOpen(false);
+                                  }}
                                   className={`w-full flex items-center justify-between px-3.5 py-2.5 text-sm transition ${
                                     selected
                                       ? "text-brand-green font-medium bg-brand-green/5"
@@ -209,7 +297,12 @@ export default function ProfileDrawer({
                                     <Icon size={15} strokeWidth={1.75} />
                                     {label}
                                   </span>
-                                  {selected && <Check size={15} className="text-brand-green" />}
+                                  {selected && (
+                                    <Check
+                                      size={15}
+                                      className="text-brand-green"
+                                    />
+                                  )}
                                 </button>
                               );
                             })}
@@ -224,11 +317,18 @@ export default function ProfileDrawer({
                   <>
                     <div className="mx-6 trace-divider opacity-40" />
                     <button
-                      onClick={() => { onClose(); setComplaintOpen(true); }}
+                      onClick={() => {
+                        onClose();
+                        setComplaintOpen(true);
+                      }}
                       className="w-full flex items-center justify-between px-6 py-3.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-brand-green/5 transition"
                     >
                       <span className="flex items-center gap-3">
-                        <MessageCircle size={18} strokeWidth={1.75} className="text-gray-400" />
+                        <MessageCircle
+                          size={18}
+                          strokeWidth={1.75}
+                          className="text-gray-400"
+                        />
                         Submit Complaint
                       </span>
                       <ChevronRight size={16} className="text-gray-300" />
@@ -254,7 +354,10 @@ export default function ProfileDrawer({
         )}
       </AnimatePresence>
 
-      <ComplaintModal open={complaintOpen} onClose={() => setComplaintOpen(false)} />
+      <ComplaintModal
+        open={complaintOpen}
+        onClose={() => setComplaintOpen(false)}
+      />
     </>
   );
 }

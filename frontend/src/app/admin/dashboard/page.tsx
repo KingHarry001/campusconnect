@@ -1,15 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  LayoutGrid, Users, BookOpen, MapPin, Megaphone, BarChart3,
-  Loader2, CheckCircle2, XCircle, Plus, Trash2, X, Eye,
-  CalendarClock, Settings, Save,
+  LayoutGrid,
+  Users,
+  BookOpen,
+  MapPin,
+  Megaphone,
+  BarChart3,
+  Loader2,
+  CheckCircle2,
+  Trash2,
+  X,
+  CalendarClock,
+  Settings,
+  Save,
+  Search,
+  ShieldCheck,
+  ShieldBan,
+  MoreVertical,
+  ChevronRight,
+  Plus,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import GridBackground from "@/components/ui/GridBackground";
+import Image from "next/image";
 
 const TABS = [
   { key: "overview", label: "Overview", icon: LayoutGrid },
@@ -37,7 +54,6 @@ function SkeletonRow() {
     </div>
   );
 }
-
 
 export default function AdminDashboard() {
   const { profile } = useAuth();
@@ -181,14 +197,17 @@ function AdminOverview() {
 }
 
 /* ─── Users Manager ─── */
+type UserFilter = "all" | "pending_approval" | "student" | "lecturer";
+
 function UsersManager() {
   const [users, setUsers] = useState<any[]>([]);
-  const [filter, setFilter] = useState<
-    "all" | "pending_approval" | "student" | "lecturer"
-  >("all");
+  const [filter, setFilter] = useState("all" as UserFilter);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
+  const [menuOpenFor, setMenuOpenFor] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -208,6 +227,16 @@ function UsersManager() {
     load();
   }, [filter]);
 
+  useEffect(() => {
+    const closeOnOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpenFor(null);
+      }
+    };
+    document.addEventListener("mousedown", closeOnOutside);
+    return () => document.removeEventListener("mousedown", closeOnOutside);
+  }, []);
+
   const approve = async (userId: string) => {
     setActing(userId);
     await supabase.from("users").update({ status: "active" }).eq("id", userId);
@@ -215,6 +244,7 @@ function UsersManager() {
       prev.map((u) => (u.id === userId ? { ...u, status: "active" } : u)),
     );
     setActing(null);
+    setMenuOpenFor(null);
   };
 
   const ban = async (userId: string, currentStatus: string) => {
@@ -225,6 +255,7 @@ function UsersManager() {
       prev.map((u) => (u.id === userId ? { ...u, status: newStatus } : u)),
     );
     setActing(null);
+    setMenuOpenFor(null);
   };
 
   const setLevel = async (userId: string, level: string) => {
@@ -236,16 +267,27 @@ function UsersManager() {
     setActing(null);
   };
 
+  const q = search.trim().toLowerCase();
+  const visibleUsers = q
+    ? users.filter((u) =>
+        [u.full_name, u.email, u.matric_number, u.staff_id]
+          .filter(Boolean)
+          .some((field: string) => field.toLowerCase().includes(q)),
+      )
+    : users;
+
   return (
     <div className="space-y-6">
-      {/* Filter tabs */}
-      <div className="flex glass-panel rounded-2xl p-1 gap-1 w-fit shadow-soft dark:shadow-soft-dark">
-        {(["all", "pending_approval", "student", "lecturer"] as const).map(
-          (f) => (
+      {/* Filter tabs + search — stacks on mobile */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex glass-panel rounded-2xl p-1 gap-1 w-full sm:w-fit overflow-x-auto shadow-soft dark:shadow-soft-dark">
+          {(
+            ["all", "pending_approval", "student", "lecturer"] as UserFilter[]
+          ).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
+              className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition whitespace-nowrap ${
                 filter === f
                   ? "bg-brand-green/10 text-brand-green shadow-glow"
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
@@ -255,8 +297,22 @@ function UsersManager() {
                 ? "Pending"
                 : f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
-          ),
-        )}
+          ))}
+        </div>
+
+        <div className="relative w-full sm:w-64">
+          <Search
+            size={15}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+          />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search name, email, ID..."
+            className="w-full glass-panel shadow-soft dark:shadow-soft-dark rounded-xl pl-9 pr-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-green/30"
+          />
+        </div>
       </div>
 
       {loading ? (
@@ -267,16 +323,19 @@ function UsersManager() {
         </div>
       ) : (
         <div className="space-y-3">
-          {users.map((u: any) => (
+          {visibleUsers.map((u: any) => (
             <div
               key={u.id}
-              className="rounded-2xl glass-panel shadow-soft dark:shadow-soft-dark p-4"
+              className={`relative rounded-2xl glass-panel shadow-soft dark:shadow-soft-dark p-4 transition hover:shadow-lifted dark:hover:shadow-lifted-dark cursor-pointer ${
+                menuOpenFor === u.id ? "z-30" : "z-0"
+              }`}
+              onClick={() => setSelectedUser(u)}
             >
-              <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div className="flex items-center gap-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
                   <div className="h-10 w-10 rounded-xl bg-gray-100 dark:bg-white/10 ring-2 ring-brand-green/15 flex items-center justify-center text-xs font-bold text-gray-600 dark:text-gray-300 overflow-hidden shrink-0">
                     {u.avatar_url ? (
-                      <img
+                      <Image
                         src={u.avatar_url}
                         alt=""
                         className="w-full h-full object-cover"
@@ -290,19 +349,20 @@ function UsersManager() {
                         .toUpperCase() || "?"
                     )}
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
                       {u.full_name}
                     </p>
-                    <p className="text-xs text-gray-400 font-mono">
-                      {u.email} · <span className="capitalize">{u.role}</span>
+                    <p className="text-xs text-gray-400 font-mono truncate">
+                      <span className="capitalize">{u.role}</span>
                       {u.level ? ` · ${u.level} Level` : ""}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-wrap">
+
+                <div className="flex items-center gap-2 shrink-0">
                   <span
-                    className={`text-xs font-mono px-2.5 py-1 rounded-full font-medium shrink-0 ${
+                    className={`hidden xs:inline-block text-[10px] sm:text-xs font-mono px-2 sm:px-2.5 py-1 rounded-full font-medium ${
                       u.status === "active"
                         ? "bg-brand-green/10 text-brand-green"
                         : u.status === "banned"
@@ -312,62 +372,105 @@ function UsersManager() {
                   >
                     {u.status.replace("_", " ")}
                   </span>
-                  {u.role === "student" && (
-                    <select
-                      value={u.level || ""}
-                      onChange={(e) => setLevel(u.id, e.target.value)}
-                      disabled={acting === u.id}
-                      className="text-xs border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-brand-green/50 disabled:opacity-50"
-                    >
-                      <option value="">Set level</option>
-                      {["100", "200", "300", "400", "500"].map((l) => (
-                        <option key={l} value={l}>
-                          {l} Level
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                  {u.status === "pending_approval" && (
+
+                  {/* Kebab menu trigger — stop propagation so it doesn't
+                      also open the detail modal */}
+                  <div
+                    className="relative"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <button
-                      onClick={() => approve(u.id)}
+                      onClick={() =>
+                        setMenuOpenFor(menuOpenFor === u.id ? null : u.id)
+                      }
                       disabled={acting === u.id}
-                      className="flex items-center gap-1 bg-brand-green text-white rounded-xl px-3 py-1.5 text-xs font-medium hover:bg-brand-green-dark transition disabled:opacity-50 shadow-glow"
+                      className="h-8 w-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10 transition disabled:opacity-50"
                     >
                       {acting === u.id ? (
-                        <Loader2 size={12} className="animate-spin" />
+                        <Loader2 size={16} className="animate-spin" />
                       ) : (
-                        <CheckCircle2 size={12} />
+                        <MoreVertical size={16} />
                       )}
-                      Approve
                     </button>
-                  )}
-                  {u.role !== "admin" && (
-                    <button
-                      onClick={() => ban(u.id, u.status)}
-                      disabled={acting === u.id}
-                      className={`flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
-                        u.status === "banned"
-                          ? "bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/15"
-                          : "bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/60"
-                      }`}
-                    >
-                      {u.status === "banned" ? "Unban" : "Ban"}
-                    </button>
-                  )}
-                  <button
-                    onClick={() => setSelectedUser(u)}
-                    className="flex items-center gap-1 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10 rounded-xl px-3 py-1.5 text-xs font-medium transition"
-                  >
-                    <Eye size={12} />
-                    Details
-                  </button>
+
+                    {menuOpenFor === u.id && (
+                      <div
+                        ref={menuRef}
+                        className="absolute right-0 top-full mt-1 w-48 glass-panel shadow-lifted dark:shadow-lifted-dark rounded-xl overflow-hidden z-20 py-1"
+                      >
+                        {u.status === "pending_approval" && (
+                          <button
+                            onClick={() => approve(u.id)}
+                            className="w-full flex items-center gap-2 px-3.5 py-2.5 text-sm text-brand-green hover:bg-brand-green/5 transition"
+                          >
+                            <CheckCircle2 size={14} />
+                            Approve
+                          </button>
+                        )}
+                        {u.role !== "admin" && (
+                          <button
+                            onClick={() => ban(u.id, u.status)}
+                            className={`w-full flex items-center gap-2 px-3.5 py-2.5 text-sm transition ${
+                              u.status === "banned"
+                                ? "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5"
+                                : "text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20"
+                            }`}
+                          >
+                            {u.status === "banned" ? (
+                              <ShieldCheck size={14} />
+                            ) : (
+                              <ShieldBan size={14} />
+                            )}
+                            {u.status === "banned" ? "Unban" : "Ban"}
+                          </button>
+                        )}
+                        {u.role === "student" && (
+                          <div className="px-3.5 py-2 border-t border-gray-100 dark:border-white/10 mt-1">
+                            <p className="text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1.5">
+                              Level
+                            </p>
+                            <select
+                              value={u.level || ""}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => setLevel(u.id, e.target.value)}
+                              className="w-full text-xs border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-brand-green/50"
+                            >
+                              <option value="">Not set</option>
+                              {["100", "200", "300", "400", "500"].map((l) => (
+                                <option key={l} value={l}>
+                                  {l} Level
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <ChevronRight size={16} className="text-gray-300 shrink-0" />
                 </div>
               </div>
+
+              {/* Status badge shown on its own line on very small screens */}
+              <span
+                className={`xs:hidden inline-block mt-2 text-[10px] font-mono px-2 py-0.5 rounded-full font-medium ${
+                  u.status === "active"
+                    ? "bg-brand-green/10 text-brand-green"
+                    : u.status === "banned"
+                    ? "bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400"
+                    : "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400"
+                }`}
+              >
+                {u.status.replace("_", " ")}
+              </span>
             </div>
           ))}
-          {users.length === 0 && (
+          {visibleUsers.length === 0 && (
             <p className="text-sm text-gray-400 py-8 text-center">
-              No users found in this category.
+              {q
+                ? "No users match your search."
+                : "No users found in this category."}
             </p>
           )}
         </div>
@@ -415,7 +518,7 @@ function UserDetailModal({
           <div className="flex flex-col sm:flex-row items-center gap-4 sm:items-start text-center sm:text-left pb-6 border-b border-gray-100 dark:border-white/10">
             <div className="h-20 w-20 rounded-2xl bg-gray-100 dark:bg-white/10 ring-4 ring-brand-green/15 shadow-glow flex items-center justify-center text-xl font-bold text-gray-600 dark:text-gray-300 overflow-hidden shrink-0">
               {user.avatar_url ? (
-                <img
+                <Image
                   src={user.avatar_url}
                   alt=""
                   className="w-full h-full object-cover"
@@ -1188,16 +1291,36 @@ function ClassesManager() {
   const [classes, setClasses] = useState<any[]>([]);
   const [courses, setCourses] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
-  const [form, setForm] = useState({ courseId: "", day: "Monday", startTime: "", endTime: "", locationId: "" });
+  const [form, setForm] = useState({
+    courseId: "",
+    day: "Monday",
+    startTime: "",
+    endTime: "",
+    locationId: "",
+  });
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ courseId: "", day: "", startTime: "", endTime: "", locationId: "" });
+  const [editForm, setEditForm] = useState({
+    courseId: "",
+    day: "",
+    startTime: "",
+    endTime: "",
+    locationId: "",
+  });
   const [savingEdit, setSavingEdit] = useState(false);
 
-  const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  const DAYS = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+  ];
 
   const load = async () => {
     setLoading(true);
@@ -1215,7 +1338,9 @@ function ClassesManager() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1243,7 +1368,13 @@ function ClassesManager() {
       return;
     }
     if (data) setClasses([data, ...classes]);
-    setForm({ courseId: "", day: "Monday", startTime: "", endTime: "", locationId: "" });
+    setForm({
+      courseId: "",
+      day: "Monday",
+      startTime: "",
+      endTime: "",
+      locationId: "",
+    });
   };
 
   const startEdit = (c: any) => {
@@ -1288,18 +1419,29 @@ function ClassesManager() {
 
   return (
     <div className="grid md:grid-cols-2 gap-6">
-      <form onSubmit={handleCreate} className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6 sm:p-8 space-y-5">
+      <form
+        onSubmit={handleCreate}
+        className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6 sm:p-8 space-y-5"
+      >
         <div>
-          <h2 className="text-lg font-medium text-gray-900 dark:text-white">Schedule a class</h2>
-          <p className="text-sm text-gray-400">Set a weekly time slot for a course</p>
+          <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+            Schedule a class
+          </h2>
+          <p className="text-sm text-gray-400">
+            Set a weekly time slot for a course
+          </p>
         </div>
 
         {error && (
-          <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 rounded-xl px-4 py-3">{error}</p>
+          <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 rounded-xl px-4 py-3">
+            {error}
+          </p>
         )}
 
         <div>
-          <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">Course</label>
+          <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">
+            Course
+          </label>
           <select
             className="w-full border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/30"
             value={form.courseId}
@@ -1307,38 +1449,54 @@ function ClassesManager() {
           >
             <option value="">Select course</option>
             {courses.map((c) => (
-              <option key={c.id} value={c.id}>{c.code} · {c.level} Level — {c.title}</option>
+              <option key={c.id} value={c.id}>
+                {c.code} · {c.level} Level — {c.title}
+              </option>
             ))}
           </select>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">Day</label>
+            <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">
+              Day
+            </label>
             <select
               className="w-full border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/30"
               value={form.day}
               onChange={(e) => setForm({ ...form, day: e.target.value })}
             >
-              {DAYS.map((d) => <option key={d} value={d}>{d}</option>)}
+              {DAYS.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
             </select>
           </div>
           <div>
-            <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">Location</label>
+            <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">
+              Location
+            </label>
             <select
               className="w-full border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/30"
               value={form.locationId}
               onChange={(e) => setForm({ ...form, locationId: e.target.value })}
             >
               <option value="">No location set</option>
-              {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+              {locations.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
             </select>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">Start time</label>
+            <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">
+              Start time
+            </label>
             <input
               type="time"
               className="w-full border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/30"
@@ -1347,7 +1505,9 @@ function ClassesManager() {
             />
           </div>
           <div>
-            <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">End time</label>
+            <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">
+              End time
+            </label>
             <input
               type="time"
               className="w-full border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/30"
@@ -1362,18 +1522,29 @@ function ClassesManager() {
           disabled={saving}
           className="flex items-center gap-2 bg-[#0a0a0a] dark:bg-white text-white dark:text-[#0a0a0a] rounded-full px-6 py-3 text-sm font-medium hover:bg-gray-800 dark:hover:bg-gray-100 transition disabled:opacity-50 shadow-soft dark:shadow-soft-dark"
         >
-          {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+          {saving ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <Plus size={14} />
+          )}
           {saving ? "Scheduling..." : "Add class"}
         </button>
       </form>
 
       <div className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6 sm:p-8">
-        <h2 className="text-lg font-medium text-gray-900 dark:text-white">Scheduled classes</h2>
-        <p className="text-sm text-gray-400 mb-6">{classes.length} weekly slots</p>
+        <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+          Scheduled classes
+        </h2>
+        <p className="text-sm text-gray-400 mb-6">
+          {classes.length} weekly slots
+        </p>
         {loading ? (
           <div className="space-y-3">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-20 rounded-2xl bg-gray-100 dark:bg-white/5 animate-pulse" />
+              <div
+                key={i}
+                className="h-20 rounded-2xl bg-gray-100 dark:bg-white/5 animate-pulse"
+              />
             ))}
           </div>
         ) : classes.length === 0 ? (
@@ -1381,33 +1552,55 @@ function ClassesManager() {
         ) : (
           <ul className="space-y-3 max-h-[500px] overflow-y-auto">
             {classes.map((c: any) => (
-              <li key={c.id} className="border border-gray-100 dark:border-white/10 rounded-2xl p-4">
+              <li
+                key={c.id}
+                className="border border-gray-100 dark:border-white/10 rounded-2xl p-4"
+              >
                 {editingId === c.id ? (
                   <div className="space-y-3">
                     <select
                       className="w-full border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-lg px-3 py-2 text-xs"
                       value={editForm.courseId}
-                      onChange={(e) => setEditForm({ ...editForm, courseId: e.target.value })}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, courseId: e.target.value })
+                      }
                     >
                       {courses.map((crs) => (
-                        <option key={crs.id} value={crs.id}>{crs.code} · {crs.level} Level</option>
+                        <option key={crs.id} value={crs.id}>
+                          {crs.code} · {crs.level} Level
+                        </option>
                       ))}
                     </select>
                     <div className="grid grid-cols-2 gap-2">
                       <select
                         className="border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-lg px-3 py-2 text-xs"
                         value={editForm.day}
-                        onChange={(e) => setEditForm({ ...editForm, day: e.target.value })}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, day: e.target.value })
+                        }
                       >
-                        {DAYS.map((d) => <option key={d} value={d}>{d}</option>)}
+                        {DAYS.map((d) => (
+                          <option key={d} value={d}>
+                            {d}
+                          </option>
+                        ))}
                       </select>
                       <select
                         className="border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-lg px-3 py-2 text-xs"
                         value={editForm.locationId}
-                        onChange={(e) => setEditForm({ ...editForm, locationId: e.target.value })}
+                        onChange={(e) =>
+                          setEditForm({
+                            ...editForm,
+                            locationId: e.target.value,
+                          })
+                        }
                       >
                         <option value="">No location</option>
-                        {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                        {locations.map((l) => (
+                          <option key={l.id} value={l.id}>
+                            {l.name}
+                          </option>
+                        ))}
                       </select>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -1415,13 +1608,20 @@ function ClassesManager() {
                         type="time"
                         className="border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-lg px-3 py-2 text-xs"
                         value={editForm.startTime}
-                        onChange={(e) => setEditForm({ ...editForm, startTime: e.target.value })}
+                        onChange={(e) =>
+                          setEditForm({
+                            ...editForm,
+                            startTime: e.target.value,
+                          })
+                        }
                       />
                       <input
                         type="time"
                         className="border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-lg px-3 py-2 text-xs"
                         value={editForm.endTime}
-                        onChange={(e) => setEditForm({ ...editForm, endTime: e.target.value })}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, endTime: e.target.value })
+                        }
                       />
                     </div>
                     <div className="flex gap-2">
@@ -1430,7 +1630,11 @@ function ClassesManager() {
                         disabled={savingEdit}
                         className="flex-1 flex items-center justify-center gap-1 bg-brand-green text-white rounded-lg px-3 py-2 text-xs font-medium disabled:opacity-50 shadow-glow"
                       >
-                        {savingEdit ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                        {savingEdit ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          <CheckCircle2 size={12} />
+                        )}
                         Save
                       </button>
                       <button
@@ -1451,14 +1655,22 @@ function ClassesManager() {
                         {c.day} · {c.start_time}–{c.end_time}
                       </p>
                       <p className="text-xs text-gray-400 mt-0.5">
-                        {c.locations?.name ? `${c.locations.name}, ${c.locations.building || ""}` : "No location set"}
+                        {c.locations?.name
+                          ? `${c.locations.name}, ${c.locations.building || ""}`
+                          : "No location set"}
                       </p>
                     </div>
                     <div className="flex gap-1 shrink-0">
-                      <button onClick={() => startEdit(c)} className="text-gray-400 hover:text-brand-green transition p-1.5 text-xs font-medium">
+                      <button
+                        onClick={() => startEdit(c)}
+                        className="text-gray-400 hover:text-brand-green transition p-1.5 text-xs font-medium"
+                      >
                         Edit
                       </button>
-                      <button onClick={() => deleteClass(c.id)} className="text-gray-300 dark:text-gray-600 hover:text-red-500 transition p-1.5">
+                      <button
+                        onClick={() => deleteClass(c.id)}
+                        className="text-gray-300 dark:text-gray-600 hover:text-red-500 transition p-1.5"
+                      >
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -1475,7 +1687,11 @@ function ClassesManager() {
 
 /* ─── Academic Settings (current semester + session) ─── */
 function AcademicSettings() {
-  const [form, setForm] = useState({ semester: "1", session: "", examStartDate: "" });
+  const [form, setForm] = useState({
+    semester: "1",
+    session: "",
+    examStartDate: "",
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -1541,21 +1757,30 @@ function AcademicSettings() {
 
   return (
     <div className="max-w-lg">
-      <form onSubmit={handleSave} className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6 sm:p-8 space-y-5">
+      <form
+        onSubmit={handleSave}
+        className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6 sm:p-8 space-y-5"
+      >
         <div className="relative dot-grid -mx-6 sm:-mx-8 -mt-6 sm:-mt-8 px-6 sm:px-8 py-6 rounded-t-3xl">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-2xl bg-brand-green/10 border border-brand-green/20 flex items-center justify-center shadow-glow">
               <CalendarClock size={18} className="text-brand-green" />
             </div>
             <div>
-              <h2 className="text-lg font-medium text-gray-900 dark:text-white">Academic calendar</h2>
-              <p className="text-xs font-mono text-gray-400">Sets the current semester across the portal</p>
+              <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                Academic calendar
+              </h2>
+              <p className="text-xs font-mono text-gray-400">
+                Sets the current semester across the portal
+              </p>
             </div>
           </div>
         </div>
 
         {error && (
-          <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 rounded-xl px-4 py-3">{error}</p>
+          <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 rounded-xl px-4 py-3">
+            {error}
+          </p>
         )}
         {saved && (
           <p className="flex items-center gap-2 text-sm text-brand-green bg-brand-green/10 rounded-xl px-4 py-3">
@@ -1564,7 +1789,9 @@ function AcademicSettings() {
         )}
 
         <div>
-          <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">Session</label>
+          <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">
+            Session
+          </label>
           <input
             className="w-full border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-green/30"
             placeholder="2025/2026"
@@ -1575,7 +1802,9 @@ function AcademicSettings() {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">Current semester</label>
+            <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">
+              Current semester
+            </label>
             <select
               className="w-full border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/30"
               value={form.semester}
@@ -1586,12 +1815,16 @@ function AcademicSettings() {
             </select>
           </div>
           <div>
-            <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">Exam start date</label>
+            <label className="text-sm font-medium block mb-2 text-gray-900 dark:text-gray-200">
+              Exam start date
+            </label>
             <input
               type="date"
               className="w-full border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/30"
               value={form.examStartDate}
-              onChange={(e) => setForm({ ...form, examStartDate: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, examStartDate: e.target.value })
+              }
             />
           </div>
         </div>
@@ -1601,7 +1834,11 @@ function AcademicSettings() {
           disabled={saving}
           className="flex items-center gap-2 bg-[#0a0a0a] dark:bg-white text-white dark:text-[#0a0a0a] rounded-full px-6 py-3 text-sm font-medium hover:bg-gray-800 dark:hover:bg-gray-100 transition disabled:opacity-50 shadow-soft dark:shadow-soft-dark"
         >
-          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+          {saving ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <Save size={14} />
+          )}
           {saving ? "Saving..." : "Save calendar"}
         </button>
       </form>

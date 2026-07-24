@@ -15,6 +15,7 @@ import {
 import GridBackground from "@/components/ui/GridBackground";
 import Footer from "@/components/Footer";
 import MobileHero from "@/components/MobileHero";
+import Image from "next/image";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 28 },
@@ -109,7 +110,7 @@ export default function LandingPage() {
           {/* Nav */}
           <nav className="flex items-center justify-between px-8 md:px-16 py-8 max-w-7xl mx-auto">
             <div className="flex items-center gap-3">
-              <img
+              <Image
                 src="/oou-crest.jpg"
                 alt="OOU crest"
                 className="h-11 w-11 object-contain rounded-full"
@@ -137,7 +138,7 @@ export default function LandingPage() {
             className="mx-4 md:mx-16 rounded-[32px] bg-[#0a0a0a] text-white px-6 md:px-10 pt-28 pb-24 text-center overflow-hidden relative"
           >
             <GridBackground />
-            <img
+            <Image
               src="/oou-crest.jpg"
               alt=""
               aria-hidden="true"

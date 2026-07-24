@@ -6,6 +6,7 @@ import { motion, Variants } from "framer-motion";
 import {
   ArrowLeft, CalendarClock, ClipboardCheck, Bell, GraduationCap, Users, ShieldCheck,
 } from "lucide-react";
+import Image from "next/image";
 
 const fadeUp: Variants = {
   hidden: { opacity: 0, y: 20 },
@@ -96,7 +97,7 @@ export default function AboutPage() {
                 "radial-gradient(circle at 80% -10%, rgba(74,222,128,0.18), transparent 55%)",
             }}
           />
-          <img
+          <Image
             src="/oou-crest.jpg"
             alt=""
             aria-hidden="true"

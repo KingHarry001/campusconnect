@@ -16,6 +16,7 @@ import {
   Camera,
   User,
   LogOut,
+  CheckCheck,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
@@ -28,12 +29,13 @@ import {
   SkeletonStatCard,
 } from "@/components/ui/SkeletonDashboardCard";
 import { useAcademicCalendar } from "@/hooks/useAcademicCalendar";
+import Image from "next/image";
 
 const TABS = [
   { key: "overview", label: "Weekly Overview", icon: LayoutGrid },
+  { key: "courses", label: "Courses", icon: ClipboardList },
   { key: "assignments", label: "Assignments", icon: ClipboardList },
   { key: "attendance", label: "Attendance", icon: CalendarCheck },
-  { key: "news", label: "News", icon: Newspaper },
 ];
 
 const WEEKDAYS = [
@@ -74,6 +76,24 @@ export default function StudentDashboard() {
   const [assignments, setAssignments] = useState<any[]>([]);
   const [classesLoading, setClassesLoading] = useState(true);
   const [assignmentsLoading, setAssignmentsLoading] = useState(true);
+  const [enrollments, setEnrollments] = useState<any[]>([]);
+  const [enrollmentsLoading, setEnrollmentsLoading] = useState(true);
+
+  const fetchEnrollments = async () => {
+    if (!profile?.id) return;
+    const { data } = await supabase
+      .from("enrollments")
+      .select(
+        "*, course:courses(*, lecturer:users!lecturer_id(id, full_name, email, avatar_url), classes(id, day, start_time, end_time, location:locations(name, building)))",
+      )
+      .eq("student_id", profile.id);
+    setEnrollments(data || []);
+    setEnrollmentsLoading(false);
+  };
+
+  useEffect(() => {
+    fetchEnrollments();
+  }, [profile?.id]);
 
   const fetchData = useCallback(async () => {
     if (authLoading || calendarLoading) return;
@@ -143,6 +163,13 @@ export default function StudentDashboard() {
             loading={classesLoading}
             assignments={assignments}
             calendar={calendar}
+          />
+        )}
+        {active === "courses" && (
+          <CoursesView
+            profile={profile}
+            enrollments={enrollments}
+            onRefresh={fetchEnrollments}
           />
         )}
         {active === "assignments" && (
@@ -352,6 +379,223 @@ function WeeklyOverview({
             </ul>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+
+function CoursesView({ profile, enrollments, onRefresh }: any) {
+  const [allCourses, setAllCourses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [acting, setActing] = useState<string | null>(null);
+
+  const enrolledIds = new Set(enrollments.map((e: any) => e.course?.id));
+
+  const getToken = async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    return session?.access_token || "";
+  };
+
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase
+        .from("courses")
+        .select(
+          "*, lecturer:users!lecturer_id(id, full_name, email, avatar_url), classes(id, day, start_time, end_time, location:locations(name, building))"
+        )
+        .eq("level", profile?.level || "")
+        .order("code");
+      setAllCourses(data || []);
+      setLoading(false);
+    };
+    if (profile?.level) load();
+  }, [profile?.level]);
+
+  const enroll = async (courseId: string) => {
+  setActing(courseId);
+  const { error } = await supabase
+    .from("enrollments")
+    .insert({ student_id: profile.id, course_id: courseId });
+
+  if (!error) {
+    await onRefresh();
+  } else if (error.code === "23505") {
+    alert("You're already enrolled in this course.");
+  } else if (error.code === "42501") {
+    alert("You can't enroll in this course.");
+  } else {
+    alert("Failed to enroll: " + error.message);
+  }
+  setActing(null);
+};
+
+const drop = async (courseId: string) => {
+  setActing(courseId);
+  const { error } = await supabase
+    .from("enrollments")
+    .delete()
+    .eq("student_id", profile.id)
+    .eq("course_id", courseId);
+
+  if (error) {
+    alert("Failed to drop course: " + error.message);
+  }
+  await onRefresh();
+  setActing(null);
+};
+
+  if (loading)
+    return (
+      <div className="flex items-center gap-2 text-sm text-gray-400 py-10">
+        <Loader2 size={16} className="animate-spin" /> Loading courses...
+      </div>
+    );
+
+  return (
+    <div className="space-y-6">
+      {/* Enrolled summary */}
+      {enrollments.length > 0 && (
+        <div className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6 sm:p-8">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">
+            Enrolled Courses
+          </h3>
+          <p className="text-sm text-gray-400 mb-6">
+            {enrollments.length} courses registered for this semester
+          </p>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {enrollments.map((e: any) => {
+              const c = e.course;
+              if (!c) return null;
+              const slots = c.classes || [];
+              return (
+                <div
+                  key={e.id}
+                  className="rounded-2xl border border-brand-green/20 bg-brand-green/5 p-4"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-mono font-bold text-brand-green bg-brand-green/10 rounded-full px-2 py-0.5">
+                          {c.code}
+                        </span>
+                      </div>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        {c.title}
+                      </p>
+                      {c.lecturer ? (
+                        <div className="flex items-center gap-2 mt-2">
+                          <div className="h-6 w-6 rounded-full bg-gray-100 dark:bg-white/10 overflow-hidden shrink-0">
+                            {c.lecturer.avatar_url ? (
+                              <Image
+                                src={c.lecturer.avatar_url}
+                                className="w-full h-full object-cover"
+                                alt=""
+                              />
+                            ) : (
+                              <span className="w-full h-full flex items-center justify-center text-[9px] font-bold text-gray-600 dark:text-gray-300">
+                                {c.lecturer.full_name?.charAt(0)}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {c.lecturer.full_name}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-400 mt-1">No lecturer assigned</p>
+                      )}
+                      {slots.length > 0 && (
+                        <div className="mt-2 space-y-0.5">
+                          {slots.map((sl: any) => (
+                            <p
+                              key={sl.id}
+                              className="text-xs font-mono text-gray-400"
+                            >
+                              {sl.day} · {sl.start_time}–{sl.end_time}{" "}
+                              {sl.location?.name ? `· ${sl.location.name}` : ""}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => drop(c.id)}
+                      disabled={acting === c.id}
+                      className="shrink-0 text-xs text-red-500 hover:text-red-600 border border-red-200 dark:border-red-500/30 rounded-lg px-2.5 py-1 transition disabled:opacity-50"
+                    >
+                      {acting === c.id ? <Loader2 size={12} className="animate-spin" /> : "Drop"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Browse all level courses */}
+      <div className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6 sm:p-8">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">
+          All {profile?.level} Level Courses
+        </h3>
+        <p className="text-sm text-gray-400 mb-6">
+          Click Enroll to add a course to your list
+        </p>
+        {allCourses.length === 0 ? (
+          <p className="text-sm text-gray-400">No courses available for your level yet.</p>
+        ) : (
+          <ul className="space-y-3">
+            {allCourses.map((c: any) => {
+              const isEnrolled = enrolledIds.has(c.id);
+              return (
+                <li
+                  key={c.id}
+                  className={`flex items-center justify-between rounded-2xl border p-4 transition ${
+                    isEnrolled
+                      ? "border-brand-green/20 bg-brand-green/5"
+                      : "border-gray-100 dark:border-white/10"
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono font-bold text-brand-green bg-brand-green/10 rounded-full px-2 py-0.5">
+                        {c.code}
+                      </span>
+                      <span className="text-xs font-mono text-gray-400">Sem {c.semester}</span>
+                      {isEnrolled && <CheckCheck size={13} className="text-brand-green" />}
+                    </div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
+                      {c.title}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {c.lecturer?.full_name || "Unassigned"}
+                    </p>
+                  </div>
+                  {isEnrolled ? (
+                    <button
+                      onClick={() => drop(c.id)}
+                      disabled={acting === c.id}
+                      className="text-xs text-red-500 hover:text-red-600 border border-red-200 dark:border-red-500/30 rounded-full px-4 py-2 transition disabled:opacity-50"
+                    >
+                      {acting === c.id ? <Loader2 size={11} className="animate-spin" /> : "Drop"}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => enroll(c.id)}
+                      disabled={acting === c.id}
+                      className="flex items-center gap-1.5 bg-brand-green text-white rounded-full px-4 py-2 text-xs font-medium hover:bg-brand-green-dark transition disabled:opacity-50 shadow-glow"
+                    >
+                      {acting === c.id ? <Loader2 size={11} className="animate-spin" /> : "Enroll"}
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
     </div>
   );
@@ -861,7 +1105,7 @@ function NewsView() {
         >
           <div className="aspect-[16/10] bg-gray-100 dark:bg-white/5 shrink-0 overflow-hidden">
             {n.image_url ? (
-              <img
+              <Image
                 src={n.image_url}
                 alt=""
                 className="w-full h-full object-cover"
@@ -993,7 +1237,7 @@ function AvatarUploadModal({ session, refreshProfile, signOut }: any) {
 
         <div className="relative w-full aspect-square max-w-[200px] border-2 border-dashed border-gray-200 dark:border-white/15 rounded-3xl overflow-hidden group flex flex-col items-center justify-center bg-gray-50 dark:bg-white/5 hover:bg-gray-100/50 dark:hover:bg-white/10 hover:border-brand-green transition cursor-pointer mb-6">
           {preview ? (
-            <img
+            <Image
               src={preview}
               alt="Preview"
               className="w-full h-full object-cover"

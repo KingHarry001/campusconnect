@@ -3,6 +3,7 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 
 const SLIDES = [
   {
@@ -45,7 +46,7 @@ export default function MobileHero() {
     <div className="min-h-screen bg-[#0a0a0a] flex flex-col md:hidden">
       <div className="flex justify-center pt-6 pb-4">
         <div className="flex items-center gap-2">
-          <img src="/oou-crest.jpg" alt="" className="h-7 w-7 object-contain rounded-full" />
+          <Image src="/oou-crest.jpg" alt="" className="h-7 w-7 object-contain rounded-full" />
           <span className="text-white font-medium text-base">Campus Connect</span>
         </div>
       </div>
@@ -55,7 +56,7 @@ export default function MobileHero() {
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
-        <img
+        <Image
           src={slide.image}
           alt=""
           className="absolute inset-0 w-full h-full object-cover"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Bot, X, Send, Loader2, MessageCircle } from "lucide-react";
+import { Bot, X, Send, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 interface Message {
@@ -42,7 +42,7 @@ export default function AIChatWidget() {
       const token = session?.access_token;
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
-      const res = await fetch(`${backendUrl}/api/ai/chat`, {
+      const res = await fetch(`$${process.env.NEXT_PUBLIC_API_URL}/api/ai/chat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
