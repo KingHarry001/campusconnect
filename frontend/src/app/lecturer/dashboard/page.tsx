@@ -259,6 +259,7 @@ function MyClasses({ profile }: any) {
 }
 
 /* ─── Attendance Sessions ─── */
+/* ─── Attendance Sessions ─── */
 function AttendanceSessions({ profile }: any) {
   const [sessions, setSessions] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
@@ -266,7 +267,7 @@ function AttendanceSessions({ profile }: any) {
   const [form, setForm] = useState({
     classId: "",
     duration: "60",
-    radius: "75",
+    radius: "50", // Changed default to 50m (realistic for mobile GPS indoors)
   });
   const [creating, setCreating] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -280,7 +281,7 @@ function AttendanceSessions({ profile }: any) {
       let q = supabase
         .from("courses")
         .select(
-          "id, code, title, classes(*, locations(name, latitude, longitude))",
+          "id, code, title, classes(*)", // Removed locations requirement
         )
         .eq("lecturer_id", profile.id);
       if (calendar)
@@ -310,28 +311,56 @@ function AttendanceSessions({ profile }: any) {
     load();
   }, [profile?.id, calendar, calendarLoading]);
 
+  // Helper function to get the lecturer's current live location
+  const getLecturerLocation = (): Promise<{ lat: number; lng: number }> => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error("Geolocation is not supported by your browser."));
+      } else {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            resolve({
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            });
+          },
+          (error) => {
+            reject(
+              new Error(
+                "Could not get your location. Please ensure location services/GPS are enabled for this browser."
+              )
+            );
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      }
+    });
+  };
+
   const handleOpen = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.classId) return;
 
-    const selectedClass = classes.find((c) => c.id === form.classId);
-    const lat = selectedClass?.latitude ?? selectedClass?.locations?.latitude;
-    const lng = selectedClass?.longitude ?? selectedClass?.locations?.longitude;
+    setCreating(true);
+    let lat: number, lng: number;
 
-    if (lat == null || lng == null) {
-      alert(
-        "This class has no location assigned. Set one before opening attendance.",
-      );
+    // 1. Get Lecturer's LIVE location instead of fixed class location
+    try {
+      const coords = await getLecturerLocation();
+      lat = coords.lat;
+      lng = coords.lng;
+    } catch (err: any) {
+      alert(err.message);
+      setCreating(false);
       return;
     }
-
-    setCreating(true);
 
     const opens = new Date();
     const closes = new Date(
       opens.getTime() + parseInt(form.duration) * 60 * 1000,
     );
 
+    // 2. Check for overlapping sessions
     const { data: overlapping, error: overlapError } = await supabase
       .from("attendance_sessions")
       .select("id")
@@ -350,6 +379,7 @@ function AttendanceSessions({ profile }: any) {
       return;
     }
 
+    // 3. Create the session using the Lecturer's coordinates
     const { error: insertError } = await supabase
       .from("attendance_sessions")
       .insert({
@@ -368,8 +398,9 @@ function AttendanceSessions({ profile }: any) {
     }
 
     setCreating(false);
-    setForm({ classId: "", duration: "60", radius: "5" });
+    setForm({ classId: "", duration: "60", radius: "50" }); // Reset with realistic radius
 
+    // 4. Refresh list
     const classIds = classes.map((c) => c.id);
     const { data: sess } = await supabase
       .from("attendance_sessions")
@@ -413,7 +444,7 @@ function AttendanceSessions({ profile }: any) {
             Open attendance window
           </h2>
           <p className="text-sm text-gray-400">
-            Students will mark attendance via GPS within the set radius
+            Students will mark attendance based on your current location.
           </p>
         </div>
 
@@ -461,14 +492,11 @@ function AttendanceSessions({ profile }: any) {
               value={form.radius}
               onChange={(e) => setForm({ ...form, radius: e.target.value })}
             >
-              <option value="1">1 m</option>
-              <option value="2">2 m</option>
-              <option value="3">3 m</option>
-              <option value="4">4 m</option>
-              <option value="5">5 m (default)</option>
-              <option value="6">6 m</option>
-              <option value="7">7 m (max)</option>
-              <option value="75">75 m</option>
+              <option value="20">20 m (Strict)</option>
+              <option value="50">50 m (Recommended)</option>
+              <option value="100">100 m (Lenient)</option>
+              <option value="250">250 m (Very Lenient)</option>
+              <option value="1000">1000 m (Campus Wide)</option>
             </select>
           </div>
         </div>
@@ -483,11 +511,11 @@ function AttendanceSessions({ profile }: any) {
           ) : (
             <Radio size={14} />
           )}
-          {creating ? "Opening..." : "Open attendance"}
+          {creating ? "Getting Location..." : "Open attendance"}
         </button>
       </form>
 
-      {/* Recent sessions */}
+      {/* Recent sessions block remains unchanged */}
       <div className="rounded-3xl glass-panel shadow-soft dark:shadow-soft-dark p-6 sm:p-8">
         <h2 className="text-lg font-medium text-gray-900 dark:text-white">
           Recent sessions
@@ -550,7 +578,6 @@ function AttendanceSessions({ profile }: any) {
                     </p>
                   </div>
 
-                  {/* Actions: View Attendees & End Session */}
                   <div className="mt-4 flex flex-wrap gap-2">
                     <button
                       onClick={() => setExpandedSession(isExpanded ? null : s.id)}
@@ -569,10 +596,8 @@ function AttendanceSessions({ profile }: any) {
                     )}
                   </div>
 
-                  {/* Expandable Attendance List Area */}
                   {isExpanded && (
                     <div className="mt-4 pt-4 border-t border-gray-100 dark:border-white/10">
-                      {/* Note: Ensure SessionAttendanceList is imported at the top of this file */}
                       <SessionAttendanceList sessionId={s.id} />
                     </div>
                   )}

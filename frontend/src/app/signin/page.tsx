@@ -1,7 +1,7 @@
 // src/app/signin/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -17,6 +17,63 @@ export default function SignInPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true); // Added to prevent form flash
+
+  // 1. Check if the user is already logged in when the page loads
+  useEffect(() => {
+    const checkExistingSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        await routeUser(session.user.id);
+      } else {
+        setCheckingSession(false);
+      }
+    };
+
+    checkExistingSession();
+  }, []);
+
+  // 2. Extracted your routing logic to keep things DRY
+  const routeUser = async (userId: string) => {
+    const { data: profile } = await supabase
+      .from("users")
+      .select("role, status, phone, level, matric_number, staff_id")
+      .eq("id", userId)
+      .maybeSingle();
+
+    setLoading(false);
+
+    if (!profile) {
+      router.push("/signup?resume=true");
+      return;
+    }
+
+    if (profile.status === "banned") {
+      setError("This account has been suspended. Contact department admin.");
+      setCheckingSession(false);
+      return;
+    }
+
+    const missingRequiredFields =
+      !profile.phone ||
+      (profile.role === "student" && (!profile.level || !profile.matric_number)) ||
+      (profile.role === "lecturer" && !profile.staff_id);
+
+    if (missingRequiredFields) {
+      router.push("/signup?resume=true");
+      return;
+    }
+
+    if (profile.status === "pending_approval") {
+      router.push("/pending-approval");
+      return;
+    }
+
+    if (profile.role === "admin") router.push("/admin/dashboard");
+    else if (profile.role === "lecturer") router.push("/lecturer/dashboard");
+    else router.push("/student/dashboard");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,47 +91,9 @@ export default function SignInPage() {
       return;
     }
 
-    const { data: profile } = await supabase
-      .from("users")
-      .select("role, status, phone, level, matric_number, staff_id")
-      .eq("id", data.user.id)
-      .maybeSingle();
-
-    setLoading(false);
-
-    // No profile row exists at all — the handle_new_user() trigger never ran
-    // (or ran before required fields existed). Send them to complete it
-    // instead of dead-ending here.
-    if (!profile) {
-      router.push("/signup?resume=true");
-      return;
+    if (data?.user) {
+      await routeUser(data.user.id);
     }
-
-    if (profile.status === "banned") {
-      setError("This account has been suspended. Contact department admin.");
-      return;
-    }
-
-    // Profile row exists but is missing required fields for its role —
-    // same resume flow, now pre-filled instead of created from scratch.
-    const missingRequiredFields =
-      !profile.phone ||
-      (profile.role === "student" && (!profile.level || !profile.matric_number)) ||
-      (profile.role === "lecturer" && !profile.staff_id);
-
-    if (missingRequiredFields) {
-       router.push("/signup?resume=true");
-      return;
-    }
-
-    if (profile.status === "pending_approval") {
-      router.push("/pending-approval");
-      return;
-    }
-
-    if (profile.role === "admin") router.push("/admin/dashboard");
-    else if (profile.role === "lecturer") router.push("/lecturer/dashboard");
-    else router.push("/student/dashboard");
   };
 
   const renderFormFields = (idSuffix: string) => (
@@ -143,6 +162,16 @@ export default function SignInPage() {
     </>
   );
 
+  // 3. Show a loader while we check if they are already logged in
+  // so the login form doesn't flicker before the redirect happens
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-[#0a0a0a]">
+        <Loader2 className="w-8 h-8 animate-spin text-brand-green" />
+      </div>
+    );
+  }
+
   return (
     <>
       {/* Mobile layout */}
@@ -154,7 +183,7 @@ export default function SignInPage() {
               src={crestImage}
               alt="Olabisi Onabanjo University crest"
               width={32} 
-  height={32}
+              height={32}
               className="h-10 w-10 object-contain rounded-full ring-2 ring-brand-green/20"
             />
             <span className="text-white font-medium text-sm">Campus Connect</span>
@@ -179,19 +208,12 @@ export default function SignInPage() {
       <div className="min-h-screen hidden md:grid md:grid-cols-2 dark:bg-[#0a0a0a] transition-colors">
         <div className="relative bg-[#0a0a0a] text-white px-10 lg:px-16 py-16 flex flex-col justify-between overflow-hidden">
           <GridBackground />
-          <Image
-              src={crestImage}
-              alt="Olabisi Onabanjo University crest"
-              width={32} 
-  height={32}
-              className="h-10 w-10 object-contain rounded-full ring-2 ring-brand-green/20"
-            />
           <div className="relative flex items-center gap-3">
             <Image
               src={crestImage}
               alt="Olabisi Onabanjo University crest"
               width={32} 
-  height={32}
+              height={32}
               className="h-10 w-10 object-contain rounded-full ring-2 ring-brand-green/20"
             />
             <span className="font-medium">Campus Connect</span>
