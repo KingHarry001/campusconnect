@@ -9,6 +9,7 @@ import { Loader2, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import GridBackground from "@/components/ui/GridBackground";
 import Image from "next/image";
+import crestImage from "../../../public/oou-crest.jpg";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -149,7 +150,13 @@ export default function SignInPage() {
         <div className="relative bg-[#0a0a0a] px-6 pt-14 pb-10 rounded-b-[32px] overflow-hidden shadow-lifted-dark">
           <GridBackground size={32} />
           <div className="relative flex items-center gap-2 mb-8">
-            <Image src="/oou-crest.jpg" alt="" className="h-8 w-8 object-contain rounded-full ring-2 ring-brand-green/20" />
+            <Image
+              src={crestImage}
+              alt="Olabisi Onabanjo University crest"
+              width={32} 
+  height={32}
+              className="h-10 w-10 object-contain rounded-full ring-2 ring-brand-green/20"
+            />
             <span className="text-white font-medium text-sm">Campus Connect</span>
           </div>
           <h1 className="relative text-white text-2xl font-medium leading-tight">
@@ -173,15 +180,18 @@ export default function SignInPage() {
         <div className="relative bg-[#0a0a0a] text-white px-10 lg:px-16 py-16 flex flex-col justify-between overflow-hidden">
           <GridBackground />
           <Image
-            src="/oou-crest.jpg"
-            alt=""
-            aria-hidden="true"
-            className="absolute -right-16 -bottom-16 w-80 h-80 object-contain opacity-[0.06] pointer-events-none"
-          />
+              src={crestImage}
+              alt="Olabisi Onabanjo University crest"
+              width={32} 
+  height={32}
+              className="h-10 w-10 object-contain rounded-full ring-2 ring-brand-green/20"
+            />
           <div className="relative flex items-center gap-3">
             <Image
-              src="/oou-crest.jpg"
+              src={crestImage}
               alt="Olabisi Onabanjo University crest"
+              width={32} 
+  height={32}
               className="h-10 w-10 object-contain rounded-full ring-2 ring-brand-green/20"
             />
             <span className="font-medium">Campus Connect</span>

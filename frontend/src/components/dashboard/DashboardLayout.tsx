@@ -6,6 +6,7 @@ import { LucideIcon, ChevronDown } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import ProfileDrawer from "@/components/dashboard/ProfileDrawer";
 import Image from "next/image";
+import crestImage from "../../../public/oou-crest.jpg";
 
 interface Tab {
   key: string;
@@ -45,10 +46,12 @@ export default function DashboardLayout({
           <div className="flex-1 overflow-y-auto">
             <div className="flex items-center gap-3 mb-10 px-1">
               <Image
-                src="/oou-crest.jpg"
-                alt=""
-                className="h-10 w-10 object-contain rounded-full ring-2 ring-brand-green/20"
-              />
+                            src={crestImage}
+                            alt="Olabisi Onabanjo University crest"
+                            width={32} 
+                height={32}
+                            className="h-10 w-10 object-contain rounded-full ring-2 ring-brand-green/20"
+                          />
               <div className="leading-tight">
                 <p className="font-medium text-sm text-gray-900 dark:text-white">
                   Campus Connect
@@ -154,9 +157,11 @@ export default function DashboardLayout({
         <header className="lg:hidden flex items-center justify-between px-5 py-4 sticky top-0 z-20 glass-panel border-x-0 border-t-0 rounded-none shadow-soft dark:shadow-soft-dark">
           <div className="flex items-center gap-2.5">
             <Image
-              src="/oou-crest.jpg"
-              alt=""
-              className="h-8 w-8 object-contain rounded-full ring-2 ring-brand-green/20"
+              src={crestImage}
+              alt="Olabisi Onabanjo University crest"
+              width={32} 
+  height={32}
+              className="h-10 w-10 object-contain rounded-full ring-2 ring-brand-green/20"
             />
             <div className="leading-tight">
               <p className="font-medium text-sm text-gray-900 dark:text-white">

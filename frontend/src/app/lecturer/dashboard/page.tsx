@@ -19,6 +19,7 @@ import { supabase } from "@/lib/supabase";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import GridBackground from "@/components/ui/GridBackground";
 import { useAcademicCalendar } from "@/hooks/useAcademicCalendar";
+import SessionAttendanceList from "@/components/SessionAttendanceList";
 
 const TABS = [
   { key: "overview", label: "Overview", icon: LayoutGrid },
@@ -269,6 +270,9 @@ function AttendanceSessions({ profile }: any) {
   });
   const [creating, setCreating] = useState(false);
   const [loading, setLoading] = useState(true);
+  
+  // Tracks which session card is currently expanded to view attendance
+  const [expandedSession, setExpandedSession] = useState<string | null>(null);
 
   useEffect(() => {
     if (!profile?.id || calendarLoading) return;
@@ -311,10 +315,6 @@ function AttendanceSessions({ profile }: any) {
     if (!form.classId) return;
 
     const selectedClass = classes.find((c) => c.id === form.classId);
-
-    // classes.locations is the joined row (via location_id), but classes
-    // also has its own latitude/longitude columns — prefer the direct
-    // columns if set, fall back to the linked location.
     const lat = selectedClass?.latitude ?? selectedClass?.locations?.latitude;
     const lng = selectedClass?.longitude ?? selectedClass?.locations?.longitude;
 
@@ -332,8 +332,6 @@ function AttendanceSessions({ profile }: any) {
       opens.getTime() + parseInt(form.duration) * 60 * 1000,
     );
 
-    // Block overlapping sessions for the same class (any session that
-    // hasn't closed yet counts as "already open")
     const { data: overlapping, error: overlapError } = await supabase
       .from("attendance_sessions")
       .select("id")
@@ -380,6 +378,25 @@ function AttendanceSessions({ profile }: any) {
       .order("opens_at", { ascending: false })
       .limit(10);
     setSessions(sess || []);
+  };
+
+  const handleEndSession = async (sessionId: string) => {
+    if (!window.confirm("Are you sure you want to end this attendance session now?")) return;
+
+    const nowIso = new Date().toISOString();
+    const { error } = await supabase
+      .from("attendance_sessions")
+      .update({ closes_at: nowIso })
+      .eq("id", sessionId);
+
+    if (error) {
+      alert("Failed to end session: " + error.message);
+      return;
+    }
+
+    setSessions(
+      sessions.map((s) => (s.id === sessionId ? { ...s, closes_at: nowIso } : s))
+    );
   };
 
   const now = new Date();
@@ -451,6 +468,7 @@ function AttendanceSessions({ profile }: any) {
               <option value="5">5 m (default)</option>
               <option value="6">6 m</option>
               <option value="7">7 m (max)</option>
+              <option value="75">75 m</option>
             </select>
           </div>
         </div>
@@ -475,6 +493,7 @@ function AttendanceSessions({ profile }: any) {
           Recent sessions
         </h2>
         <p className="text-sm text-gray-400 mb-6">Last 10 attendance windows</p>
+        
         {loading ? (
           <div className="space-y-3">
             {[...Array(3)].map((_, i) => (
@@ -491,10 +510,12 @@ function AttendanceSessions({ profile }: any) {
             {sessions.map((s: any) => {
               const isActive =
                 new Date(s.opens_at) <= now && new Date(s.closes_at) >= now;
+              const isExpanded = expandedSession === s.id;
+
               return (
                 <li
                   key={s.id}
-                  className="border border-gray-100 dark:border-white/10 rounded-2xl p-4"
+                  className="border border-gray-100 dark:border-white/10 rounded-2xl p-4 transition-all"
                 >
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-mono font-medium text-gray-900 dark:text-white">
@@ -510,21 +531,51 @@ function AttendanceSessions({ profile }: any) {
                       {isActive ? "● Live" : "Closed"}
                     </span>
                   </div>
-                  <p className="text-xs font-mono text-gray-400 mt-1">
-                    {new Date(s.opens_at).toLocaleString([], {
-                      month: "short",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                    {" → "}
-                    {new Date(s.closes_at).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                    {" · "}
-                    {s.radius}m radius
-                  </p>
+                  
+                  <div className="flex justify-between items-end mt-1">
+                    <p className="text-xs font-mono text-gray-400">
+                      {new Date(s.opens_at).toLocaleString([], {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                      {" → "}
+                      {new Date(s.closes_at).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                      {" · "}
+                      {s.radius}m radius
+                    </p>
+                  </div>
+
+                  {/* Actions: View Attendees & End Session */}
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setExpandedSession(isExpanded ? null : s.id)}
+                      className="text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 px-3 py-1.5 rounded-full transition"
+                    >
+                      {isExpanded ? "Hide Attendance" : "View Attendance"}
+                    </button>
+
+                    {isActive && (
+                      <button
+                        onClick={() => handleEndSession(s.id)}
+                        className="text-xs font-medium text-red-600 bg-red-50 dark:bg-red-500/10 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20 px-3 py-1.5 rounded-full transition"
+                      >
+                        End Session
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Expandable Attendance List Area */}
+                  {isExpanded && (
+                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-white/10">
+                      {/* Note: Ensure SessionAttendanceList is imported at the top of this file */}
+                      <SessionAttendanceList sessionId={s.id} />
+                    </div>
+                  )}
                 </li>
               );
             })}
