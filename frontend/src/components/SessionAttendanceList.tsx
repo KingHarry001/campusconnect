@@ -1,3 +1,4 @@
+// src/components/SessionAttendanceList.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -50,7 +51,7 @@ export default function SessionAttendanceList({ sessionId }: Props) {
         setError("Failed to load attendance records.");
         console.error(fetchError);
       } else {
-        // @ts-ignore - Supabase types for joined tables can be tricky, safely casting here
+        // @ts-expect-error - Supabase types for joined tables can be tricky, safely casting here
         setRecords(data as AttendanceRecord[]);
       }
 
@@ -65,7 +66,7 @@ export default function SessionAttendanceList({ sessionId }: Props) {
   if (loading) {
     return (
       <div className="flex justify-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-green"></div>
       </div>
     );
   }
@@ -81,12 +82,12 @@ export default function SessionAttendanceList({ sessionId }: Props) {
 
   return (
     <div className="bg-white/50 dark:bg-white/5 rounded-2xl border border-gray-200 dark:border-white/10 overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-        <h3 className="text-lg font-semibold flex items-center gap-2">
+      <div className="px-6 py-4 border-b border-gray-200 dark:border-white/10 flex items-center justify-between">
+        <h3 className="text-lg font-semibold flex items-center gap-2 dark:text-white">
           <Users size={18} />
           Checked-in Students
         </h3>
-        <span className="bg-blue-50 text-blue-700 py-1 px-3 rounded-full text-sm font-medium">
+        <span className="bg-brand-green/10 text-brand-green py-1 px-3 rounded-full text-sm font-medium">
           {records.length} Present
         </span>
       </div>
@@ -96,14 +97,14 @@ export default function SessionAttendanceList({ sessionId }: Props) {
           No students have checked in yet.
         </div>
       ) : (
-        <ul className="divide-y divide-gray-100">
+        <ul className="divide-y divide-gray-100 dark:divide-white/10">
           {records.map((record) => (
             <li
               key={record.id}
-              className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition"
+              className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-white/5 transition"
             >
               <div className="flex items-center gap-4">
-                <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                <div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-gray-800 flex items-center justify-center overflow-hidden">
                   {record.student.avatar_url ? (
                     <img
                       src={record.student.avatar_url}
@@ -111,22 +112,22 @@ export default function SessionAttendanceList({ sessionId }: Props) {
                       className="h-full w-full object-cover"
                     />
                   ) : (
-                    <span className="text-gray-500 font-medium">
+                    <span className="text-gray-500 dark:text-gray-400 font-medium">
                       {record.student.full_name.charAt(0)}
                     </span>
                   )}
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">
+                  <p className="font-medium text-gray-900 dark:text-white">
                     {record.student.full_name}
                   </p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
                     {record.student.matric_number || "No Matric Number"}
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5 text-sm text-gray-500">
+              <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
                 <Clock size={14} />
                 {new Date(record.marked_at).toLocaleTimeString([], {
                   hour: "2-digit",
