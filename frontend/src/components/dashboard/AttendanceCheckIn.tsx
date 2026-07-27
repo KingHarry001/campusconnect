@@ -43,11 +43,11 @@ export default function AttendanceCheckIn({ classId }: Props) {
     setStatus("loading");
     setMessage("");
 
-    // 1. Get active session for this class
+    // 1. Get active session for this class AND fetch the parent course_id
     const now = new Date().toISOString();
     const { data: session, error: sessionError } = await supabase
       .from("attendance_sessions")
-      .select("*")
+      .select("*, classes(course_id)") // <-- ADDED: Fetch the course_id from the classes table
       .eq("class_id", classId)
       .lte("opens_at", now)
       .gte("closes_at", now)
@@ -59,7 +59,7 @@ export default function AttendanceCheckIn({ classId }: Props) {
       return;
     }
 
-    // 2. STRICT Location Check: We no longer silently fail to 0,0
+    // 2. STRICT Location Check
     let userLat = 0;
     let userLon = 0;
     
@@ -77,7 +77,6 @@ export default function AttendanceCheckIn({ classId }: Props) {
       userLon = pos.coords.longitude;
     } catch (error: any) {
       setStatus("error");
-      // Tell the student exactly why it failed instead of hiding it
       setMessage("Location access denied. Please allow GPS permissions in your browser settings to mark attendance.");
       return; 
     }
@@ -95,7 +94,7 @@ export default function AttendanceCheckIn({ classId }: Props) {
       session.latitude,
       session.longitude,
     );
-    const radius = session.radius ?? 50; // Match the 50m default we set for the lecturer
+    const radius = session.radius ?? 50;
 
     if (distance > radius) {
       setStatus("error");
@@ -112,12 +111,19 @@ export default function AttendanceCheckIn({ classId }: Props) {
       return;
     }
 
-    // Actually check if the student is enrolled (fixed ESLint warning here)
+    const actualCourseId = session.classes?.course_id;
+
+    if (!actualCourseId) {
+      setStatus("error");
+      setMessage("System error: Could not verify course enrollment data.");
+      return;
+    }
+
     const { data: enrollment } = await supabase
       .from("enrollments")
       .select("id")
       .eq("student_id", profile.id)
-      .eq("course_id", session.class_id)
+      .eq("course_id", actualCourseId) // <-- FIXED: Now checking the actual Course ID
       .maybeSingle();
 
     if (!enrollment) {
