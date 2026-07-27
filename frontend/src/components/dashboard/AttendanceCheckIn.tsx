@@ -1,3 +1,4 @@
+// src/components/dashboard/AttendanceCheckIn.tsx
 "use client";
 
 import { useState } from "react";
@@ -58,30 +59,33 @@ export default function AttendanceCheckIn({ classId }: Props) {
       return;
     }
 
-    // 2. Get user's GPS position with a fallback for testing environments
+    // 2. STRICT Location Check: We no longer silently fail to 0,0
     let userLat = 0;
     let userLon = 0;
     
     try {
-      if (!navigator.geolocation) throw new Error("Geolocation not supported");
+      if (!navigator.geolocation) throw new Error("Geolocation not supported by your browser.");
       
       const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: true,
-          timeout: 5000,
+          timeout: 10000,
+          maximumAge: 0
         }),
       );
       userLat = pos.coords.latitude;
       userLon = pos.coords.longitude;
-    } catch (err) {
-      console.warn("Location access denied or unavailable. Using fallback coordinates for testing.");
-      // We NO LONGER return an error here. It just defaults to 0,0 and keeps going.
+    } catch (error: any) {
+      setStatus("error");
+      // Tell the student exactly why it failed instead of hiding it
+      setMessage("Location access denied. Please allow GPS permissions in your browser settings to mark attendance.");
+      return; 
     }
 
     // 3. Distance check
     if (session.latitude == null || session.longitude == null) {
       setStatus("error");
-      setMessage("This session has no location configured.");
+      setMessage("This session has no valid location configured by the lecturer.");
       return;
     }
 
@@ -91,12 +95,12 @@ export default function AttendanceCheckIn({ classId }: Props) {
       session.latitude,
       session.longitude,
     );
-    const radius = session.radius ?? 5;
+    const radius = session.radius ?? 50; // Match the 50m default we set for the lecturer
 
     if (distance > radius) {
       setStatus("error");
       setMessage(
-        `You are ${distance.toFixed(1)}m away, outside the ${radius}m radius.`,
+        `You are ${distance.toFixed(1)}m away. You must be within ${radius}m of the lecturer to check in.`,
       );
       return;
     }
@@ -108,12 +112,19 @@ export default function AttendanceCheckIn({ classId }: Props) {
       return;
     }
 
+    // Actually check if the student is enrolled (fixed ESLint warning here)
     const { data: enrollment } = await supabase
       .from("enrollments")
       .select("id")
       .eq("student_id", profile.id)
       .eq("course_id", session.class_id)
       .maybeSingle();
+
+    if (!enrollment) {
+      setStatus("error");
+      setMessage("You are not officially enrolled in this course.");
+      return;
+    }
 
     // 5. Insert record
     const { error: insertError } = await supabase
@@ -151,7 +162,7 @@ export default function AttendanceCheckIn({ classId }: Props) {
 
   if (status === "success") {
     return (
-      <div className="flex items-center gap-2 text-green-600 bg-green-50 rounded-2xl px-4 py-3 text-sm">
+      <div className="flex items-center gap-2 text-green-600 bg-green-50 dark:bg-green-500/10 dark:text-green-400 rounded-2xl px-4 py-3 text-sm">
         <CheckCircle size={16} />
         <span>{message}</span>
       </div>
@@ -161,13 +172,13 @@ export default function AttendanceCheckIn({ classId }: Props) {
   return (
     <div className="flex flex-col gap-3">
       {(status === "error" || status === "already") && (
-        <div className="flex items-center gap-2 text-red-600 bg-red-50 rounded-2xl px-4 py-3 text-sm">
+        <div className="flex items-center gap-2 text-red-600 bg-red-50 dark:bg-red-500/10 dark:text-red-400 rounded-2xl px-4 py-3 text-sm">
           <AlertCircle size={15} />
           <span>{message}</span>
         </div>
       )}
       {status === "no_session" && (
-        <div className="flex items-center gap-2 text-amber-600 bg-amber-50 rounded-2xl px-4 py-3 text-sm">
+        <div className="flex items-center gap-2 text-amber-600 bg-amber-50 dark:bg-amber-500/10 dark:text-amber-400 rounded-2xl px-4 py-3 text-sm">
           <AlertCircle size={15} />
           <span>{message}</span>
         </div>
@@ -175,14 +186,14 @@ export default function AttendanceCheckIn({ classId }: Props) {
       <button
         onClick={handleCheckIn}
         disabled={status === "loading"}
-        className="flex items-center gap-2 bg-[#0a0a0a] text-white rounded-full px-5 py-2.5 text-sm font-medium hover:bg-gray-800 transition disabled:opacity-50 w-fit"
+        className="flex items-center justify-center gap-2 bg-[#0a0a0a] dark:bg-white text-white dark:text-[#0a0a0a] rounded-full px-5 py-2.5 text-sm font-medium hover:bg-gray-800 dark:hover:bg-gray-100 transition disabled:opacity-50 w-full sm:w-fit"
       >
         {status === "loading" ? (
           <Loader2 size={16} className="animate-spin" />
         ) : (
           <MapPin size={16} />
         )}
-        {status === "loading" ? "Processing..." : "Mark attendance"}
+        {status === "loading" ? "Finding your location..." : "Mark attendance"}
       </button>
     </div>
   );
